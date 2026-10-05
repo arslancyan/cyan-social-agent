@@ -37,7 +37,7 @@ export async function currentUser():Promise<SessionUser|null>{
  const r=await pool.query("SELECT u.id,u.email,u.plan FROM cyan_sessions s JOIN cyan_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()",[hashToken(token)]);
  return r.rows[0]?(r.rows[0] as SessionUser):null;
 }
-export async function requireUser(){const user=await currentUser();if(!user)throw new Error("UNAUTHENTICATED");return user;}
+export async function requireUser(){const user=await currentUser();if(!user)throw new Error("UNAUTHENTICATED");return user;}\n\nexport async function rateLimit(key:string,limit:number,windowSeconds:number){\n await dbReady();\n const sql="INSERT INTO cyan_rate_limits(key,count,reset_at) VALUES($1,1,NOW()+($2 * INTERVAL '1 second')) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN cyan_rate_limits.reset_at<=NOW() THEN 1 ELSE cyan_rate_limits.count+1 END, reset_at=CASE WHEN cyan_rate_limits.reset_at<=NOW() THEN NOW()+($2 * INTERVAL '1 second') ELSE cyan_rate_limits.reset_at END WHERE cyan_rate_limits.reset_at<=NOW() OR cyan_rate_limits.count < $3 RETURNING count";\n const r=await pool.query(sql,[key,windowSeconds,limit]);\n return r.rowCount===1;\n}
 export async function logout(){
  const c=await cookies(),token=c.get("cyan_session")?.value;
  if(token){await dbReady();await pool.query("DELETE FROM cyan_sessions WHERE token_hash=$1",[hashToken(token)]);}
