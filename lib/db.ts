@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS cyan_connections(workspace_id TEXT NOT NULL DEFAULT '
 CREATE TABLE IF NOT EXISTS cyan_patterns(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,pattern_type TEXT NOT NULL,pattern_key TEXT NOT NULL,score NUMERIC NOT NULL DEFAULT 50,confidence NUMERIC NOT NULL DEFAULT 0,samples INTEGER NOT NULL DEFAULT 0,successes INTEGER NOT NULL DEFAULT 0,failures INTEGER NOT NULL DEFAULT 0,first_observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),last_observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),metadata JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE UNIQUE INDEX IF NOT EXISTS cyan_patterns_workspace_type_key_idx ON cyan_patterns(workspace_id,pattern_type,pattern_key);
 CREATE INDEX IF NOT EXISTS cyan_patterns_workspace_score_idx ON cyan_patterns(workspace_id,score DESC,updated_at DESC);
+CREATE TABLE IF NOT EXISTS cyan_strategy_decisions(id BIGSERIAL PRIMARY KEY,workspace_id TEXT NOT NULL,trend_id TEXT NULL,platform TEXT NOT NULL,angle TEXT NOT NULL,decision TEXT NOT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,priority INTEGER NOT NULL DEFAULT 0,confidence INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL,metadata JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS cyan_strategy_decisions_workspace_idx ON cyan_strategy_decisions(workspace_id,created_at DESC);
 
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
