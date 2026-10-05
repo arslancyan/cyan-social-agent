@@ -22,6 +22,7 @@ export async function POST(req:Request){
   const context=buildBrainContext(topic);
   const learning=await runAsUser(user,()=>learningSignals());
   const strategy=await runAsUser(user,()=>generationStrategy());
+  const adaptations=await runAsUser(user,()=>platformAdaptationPlans());
   const trendContext=trend?["Verified trend signal:",trend.title,trend.summary,trend.sourceUrl?"Source: "+trend.sourceUrl:"","Score: "+trend.score].filter(Boolean).join("\n"):"No verified trend signal was supplied.";
   const apiKey=process.env.OPENAI_API_KEY;
   if(!apiKey){
