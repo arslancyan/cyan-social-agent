@@ -8,7 +8,7 @@ export const dynamic="force-dynamic";
 export async function GET(){
  const user=await currentUser();
  if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});
- return runAsUser(user,async()=>{
+ try{return await runAsUser(user,async()=>{
   await dbReady();
   const control=await getControl();
   const [queue,trends,published]=await Promise.all([
