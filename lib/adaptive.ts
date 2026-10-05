@@ -29,7 +29,7 @@ export async function platformPerformanceScores():Promise<PlatformScore[]>{
   const published=rows.filter((x:any)=>x.type==="publish").length;
   const failed=rows.filter((x:any)=>x.type==="publish_failed").length;
   const reliability=(published+failed)?published/(published+failed):0.5;
-  const evidence=s.snapshots;
+  const evidence=s.samples;
   const prior=platform==="X"?62:platform==="TikTok"?60:platform==="Instagram"?58:52;
   const evidenceWeight=Math.min(.8,evidence/12);
   const score=prior*(1-evidenceWeight)+(s.score*.85+reliability*100*.15)*evidenceWeight;
