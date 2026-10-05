@@ -56,9 +56,11 @@ export async function dbReady(){
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
    CREATE TABLE IF NOT EXISTS cyan_worker_runs (
-    id BIGSERIAL PRIMARY KEY, ran_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id BIGSERIAL PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT 'local', ran_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ok BOOLEAN NOT NULL, detail TEXT NOT NULL
    );
+   ALTER TABLE cyan_worker_runs ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'local';
+   CREATE INDEX IF NOT EXISTS cyan_worker_runs_workspace_idx ON cyan_worker_runs(workspace_id,ran_at DESC);
    CREATE TABLE IF NOT EXISTS cyan_trends (
     id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT 'local',
     title TEXT NOT NULL, summary TEXT NOT NULL, source_url TEXT NULL,
