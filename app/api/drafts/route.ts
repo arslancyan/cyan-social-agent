@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 import {listDrafts,saveDrafts,updateStatus} from "@/lib/store";
 import {buildDrafts} from "@/lib/agent";
-import {consumeUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
+import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
 
 export async function GET(){
  try{const u=await requireUser();return NextResponse.json(await runAsUser(u,async()=>({drafts:await listDrafts()})))}
@@ -21,6 +21,7 @@ export async function POST(req:Request){
    return NextResponse.json({drafts:saved});
   }catch(e){
    const msg=e instanceof Error?e.message:"";
+   await releaseUsage(u,"generations");
    console.error("Draft generation persistence failed",e);
    return NextResponse.json({error:"Could not save generated drafts."},{status:503});
   }
