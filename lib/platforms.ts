@@ -38,7 +38,9 @@ async function publishX(draft:Draft):Promise<PublishResult>{
   }
   const data=await response.json().catch(()=>({}));
   if(!response.ok)return{platform:"X",ok:false,message:data?.detail||data?.title||"X API rejected the post."};
-  return{platform:"X",ok:true,message:"Published through the official X API.",externalId:data?.data?.id};
+  const externalId=typeof data?.data?.id==="string"?data.data.id:"";
+  if(!externalId)return{platform:"X",ok:false,message:"X API returned success without a post ID; publication state was not committed."};
+  return{platform:"X",ok:true,message:"Published through the official X API.",externalId};
  }catch(e){return{platform:"X",ok:false,message:e instanceof Error?e.message:"X publishing failed."};}
 }
 async function refreshTikTok(refreshToken:string){
