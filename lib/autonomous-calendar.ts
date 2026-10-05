@@ -20,8 +20,16 @@ export async function allocateAutonomousCalendar(drafts:Draft[],explorationIds:S
  const existing=await pool.query("SELECT platform,scheduled_at FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled' AND scheduled_at>=NOW() ORDER BY scheduled_at ASC LIMIT 100",[workspaceId()]);
  const occupied=new Set<string>(existing.rows.map((x:any)=>hourKey(new Date(x.scheduled_at),control.timezone)+":"+String(x.platform)));
  const chosen:CalendarSlot[]=[];
+ const portfolio:{platform:string;exploration:number;total:number}[]=[];
+ const counts=new Map<string,{exploration:number;total:number}>();
+ for(const x of existing.rows){const key=String(x.platform);const v=counts.get(key)||{exploration:0,total:0};v.total++;counts.set(key,v);}
+ const platformOrder=["X","TikTok","Instagram","Facebook"];
  for(const p of plans.filter(x=>x.score>=65&&x.confidence>=25)){
+  const current=counts.get(p.platform)||{exploration:0,total:0};
   const allocation=explorationIds.has(p.draftId)?"exploration":"exploitation";
+  const totalPlanned=chosen.length+1;
+  const minShare=totalPlanned>=4?Math.max(1,Math.floor(totalPlanned/Math.max(1,platformOrder.length))):0;
+  if(minShare&&current.total>=Math.ceil(totalPlanned*.6))continue;
   let at=new Date(p.recommendedAt);
   let placed=false;
   for(let step=0;step<48;step++){
