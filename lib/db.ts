@@ -57,7 +57,7 @@ export async function dbReady(){
    ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS external_id TEXT NULL;
    ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS publish_attempts INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS publish_started_at TIMESTAMPTZ NULL;
-   CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(status, scheduled_at);
+   CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(workspace_id,status,scheduled_at);
    CREATE TABLE IF NOT EXISTS cyan_control (
     workspace_id TEXT PRIMARY KEY, mode TEXT NOT NULL DEFAULT 'smart',
     paused BOOLEAN NOT NULL DEFAULT FALSE, heartbeat_at TIMESTAMPTZ NULL,
