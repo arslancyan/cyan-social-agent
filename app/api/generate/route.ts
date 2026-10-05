@@ -22,7 +22,7 @@ export async function POST(req:Request){
    ]);
   }else{
    const prompt=["You are CYAN, a responsible social media agent.","Create original platform-native drafts from the supplied topic.","Do not invent facts. Clearly flag unsupported claims.","Return ONLY a JSON array. No markdown fences.","Each item must contain platform, angle, content.","Platforms: X, TikTok, Instagram.","Topic:",topic.trim()].join("\n");
-   const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"content-type":"application/json","authorization:"Bearer "+apiKey},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5.6-luna",input:prompt})});
+   const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+apiKey},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5.6-luna",input:prompt})});
    if(!response.ok){await releaseUsage(user,"generations");return NextResponse.json({error:"AI provider request failed"},{status:502});}
    const data=await response.json();
    drafts=cleanDrafts(parseModelOutput(String(data.output_text||"")));
