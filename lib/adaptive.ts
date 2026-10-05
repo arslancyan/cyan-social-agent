@@ -2,6 +2,7 @@ import {dbReady,pool} from "./db";
 import {workspaceId} from "./auth";
 import {getControl} from "./store";
 import {Draft,Platform} from "./types";
+import {classifyContent} from "./content-intelligence";
 
 type PlatformScore={platform:Platform;score:number;confidence:number;samples:number;published:number;successRate:number;engagementRate:number;avgViews:number;reason:string};
 type SlotScore={platform:Platform;hour:number;day:number;score:number;confidence:number;samples:number;reason:string};
@@ -27,6 +28,8 @@ export async function anglePerformanceScores(platform?:Platform):Promise<AngleSc
  for(const row of r.rows){const key=String(row.angle||"unknown");if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(row);}
  return[...groups.entries()].map(([angle,rows])=>{const s=weightedScore(rows);return{angle,score:Math.round(s.score),confidence:Math.round(s.confidence),samples:s.samples,engagementRate:Number(s.engagementRate.toFixed(4)),avgViews:Math.round(s.avgViews),reason:s.samples<5?"Early signal; keep testing this angle.":"Learned from recent performance snapshots."};}).sort((a,b)=>b.score-a.score);
 }
+
+export async function featurePerformanceScores(platform?:Platform){await dbReady();const sql=`SELECT d.features,e.metadata,e.created_at FROM cyan_events e JOIN cyan_drafts d ON d.id=e.draft_id AND d.workspace_id=e.workspace_id WHERE e.workspace_id=$1 AND e.type='performance_snapshot' AND e.created_at>=NOW()-INTERVAL '90 days' ${platform?"AND e.platform=$2":""} LIMIT 4000`;const r=await pool.query(sql,platform?[workspaceId(),platform]:[workspaceId()]);const groups=new Map<string,any[]>();for(const row of r.rows){for(const [k,v] of Object.entries(row.features||{})){if(v===undefined||v===null||v==="")continue;const key=k+":"+String(v);if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(row);}}return[...groups.entries()].map(([key,rows])=>{const [feature,value]=key.split(":");const s=weightedScore(rows);return{feature,value,score:Math.round(s.score),confidence:Math.round(s.confidence),samples:s.samples,engagementRate:Number(s.engagementRate.toFixed(4))};}).sort((a,b)=>b.score-a.score);}
 export async function timeSlotScores(platform:Platform){
  await dbReady();const r=await pool.query("SELECT type,metadata,created_at FROM cyan_events WHERE workspace_id=$1 AND platform=$2 AND created_at>=NOW()-INTERVAL '90 days' ORDER BY created_at DESC LIMIT 2000",[workspaceId(),platform]);
  const control=await getControl(),map=new Map<string,any[]>();for(const row of r.rows){const d=new Date(row.created_at),parts=new Intl.DateTimeFormat("en-US",{timeZone:control.timezone,weekday:"short",hour:"2-digit",hour12:false}).formatToParts(d),wd=parts.find(x=>x.type==="weekday")?.value||"Sun",hour=Number(parts.find(x=>x.type==="hour")?.value||0),days:any={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6},key=String(days[wd])+"-"+String(hour);if(!map.has(key))map.set(key,[]);map.get(key)!.push(row);}
@@ -34,8 +37,8 @@ export async function timeSlotScores(platform:Platform){
 }
 function nextOccurrence(day:number,hour:number,from:Date,timezone:string){const days:any={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};for(let i=0;i<24*15;i++){const d=new Date(from.getTime()+i*3600000),parts=new Intl.DateTimeFormat("en-US",{timeZone:timezone,weekday:"short",hour:"2-digit",hour12:false}).formatToParts(d),wd=parts.find(x=>x.type==="weekday")?.value||"Sun",h=Number(parts.find(x=>x.type==="hour")?.value||0);if(days[wd]===day&&h===hour&&d.getTime()>from.getTime()+30*60000)return d;}return new Date(from.getTime()+24*3600000);}
 export async function adaptivePlan(drafts:Draft[],now=new Date()){
- const control=await getControl(),platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),angleBy=new Map(angles.map(x=>[x.angle,x]));
- const candidates=await Promise.all(drafts.map(async d=>{const p=platforms.find(x=>x.platform===d.platform)!;const best=(await timeSlotScores(d.platform))[0],a=angleBy.get(d.angle),angleScore=a?.score??55,score=Math.round(p.score*.45+angleScore*.25+best.score*.30),confidence=Math.round((p.confidence+(a?.confidence||0)+best.confidence)/3);return{draftId:d.id,experimentId:d.experimentId||null,variant:d.variant||null,platform:d.platform,angle:d.angle,score,confidence,recommendedAt:nextOccurrence(best.day,best.hour,now,control.timezone).toISOString(),platformScore:p.score,angleScore,timeScore:best.score,reason:[p.reason,a?.reason||"No angle history; exploration recommended.",best.reason].join(" ")};}));
+ const control=await getControl(),platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),features=await featurePerformanceScores(),angleBy=new Map(angles.map(x=>[x.angle,x])),featureBy=new Map(features.map(x=>[x.feature+":"+x.value,x]));
+ const candidates=await Promise.all(drafts.map(async d=>{const p=platforms.find(x=>x.platform===d.platform)!;const best=(await timeSlotScores(d.platform))[0],a=angleBy.get(d.angle),f=d.features||classifyContent(d.content,d.platform,d.mediaType),fs=Object.entries(f).map(([k,v])=>featureBy.get(k+":"+String(v))).filter(Boolean) as any[],featureScore=fs.length?fs.reduce((n,x)=>n+x.score,0)/fs.length:55,angleScore=a?.score??55,score=Math.round(p.score*.35+angleScore*.20+featureScore*.20+best.score*.25),confidence=Math.round((p.confidence+(a?.confidence||0)+best.confidence)/3);return{draftId:d.id,experimentId:d.experimentId||null,variant:d.variant||null,platform:d.platform,angle:d.angle,score,confidence,recommendedAt:nextOccurrence(best.day,best.hour,now,control.timezone).toISOString(),platformScore:p.score,angleScore,featureScore:Math.round(featureScore),timeScore:best.score,features:f,reason:[p.reason,a?.reason||"No angle history; exploration recommended.",best.reason].join(" ")};}));
  return candidates.sort((a,b)=>b.score-a.score);
 }
 export async function chooseBestDecision(drafts:Draft[],now=new Date()){
@@ -46,10 +49,10 @@ export async function chooseBestDecision(drafts:Draft[],now=new Date()){
  return explore.score>=exploit.score-8?explore:exploit;
 }
 export async function generationStrategy(now=new Date()){
- const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores();
+ const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),features=await featurePerformanceScores();
  const bestPlatform=platforms[0],bestAngle=angles[0];
  const lowConfidence=platforms.filter(x=>x.confidence<55).map(x=>x.platform);
- return {bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
+ return {bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,topFeatures:features.slice(0,8),explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
 }
 export async function autoScheduleAdaptive(draftIds:string[],mode:"smart"|"autonomous"){
  if(mode!=="autonomous")return{scheduled:[],skipped:"Autonomous mode required for automatic scheduling."};
