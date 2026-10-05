@@ -33,9 +33,12 @@ export async function claimDueDrafts(now=new Date()){await dbReady();const clien
 export async function recoverStalePublishing(now=new Date()){
  await dbReady();
  const cutoff=new Date(now.getTime()-15*60*1000).toISOString();
- const r=await pool.query(`UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1,publish_started_at=NULL
-  WHERE workspace_id=$2 AND status='publishing' AND scheduled_at IS NOT NULL AND scheduled_at <= $3
-  RETURNING id`,[now.toISOString(),workspaceId(),cutoff]);
+ const r=await pool.query(`UPDATE cyan_drafts
+  SET status=CASE WHEN external_id IS NULL AND scheduled_at IS NULL THEN 'review' ELSE 'scheduled' END,
+      scheduled_at=CASE WHEN external_id IS NULL AND scheduled_at IS NULL THEN NULL ELSE $1 END,
+      publish_started_at=NULL
+  WHERE workspace_id=$2 AND status='publishing' AND publish_started_at IS NOT NULL AND publish_started_at <= $3
+  RETURNING id,status`,[now.toISOString(),workspaceId(),cutoff]);
  return r.rowCount||0;
 }
 export async function dueDrafts(now=new Date()){return claimDueDrafts(now);}
