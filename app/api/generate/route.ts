@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {saveDrafts,latestTrends,learningSignals,recordEvent} from "@/lib/store";
+import {saveDrafts,latestTrends,learningSignals,recordEvent,contentFatigue} from "@/lib/store";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
 import {Platform} from "@/lib/types";
 import {buildBrainContext,inspectDraft} from "@/lib/agent";
@@ -36,6 +36,8 @@ export async function POST(req:Request){
    if(drafts.length===0){await releaseUsage(user,"generations");return NextResponse.json({error:"AI returned no valid drafts. Try a more specific topic."},{status:502});}
   }
   try{
+   const freshDrafts=await runAsUser(user,()=>contentFatigue(drafts));
+   if(freshDrafts.length>0)drafts=freshDrafts;
    await runAsUser(user,()=>saveDrafts(drafts));
   }catch(e){
    await releaseUsage(user,"generations");
