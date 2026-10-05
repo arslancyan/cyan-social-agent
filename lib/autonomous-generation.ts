@@ -4,11 +4,11 @@ import {createExperiment,generationStrategy,platformAdaptationPlans} from "./ada
 import {allocateAutonomousCalendar} from "./autonomous-calendar";
 import {contentFatigue,recordEvent,saveDrafts} from "./store";
 import {classifyContent} from "./content-intelligence";
-import {AutonomyDecision} from "./autonomy";
+import {StrategyDecision} from "./autonomy";
 import {dbReady,pool} from "./db";
 import {Draft,Platform} from "./types";
 
-function clean(input:any[],decision:AutonomyDecision):Draft[]{
+function clean(input:any[],decision:StrategyDecision):Draft[]{
  const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);
  return input.filter(x=>x&&allowed.has(x.platform)&&typeof x.content==="string"&&x.content.trim()).slice(0,4).map(x=>({
   id:x.id||crypto.randomUUID(),
