@@ -41,3 +41,5 @@ export async function GET(){
   return NextResponse.json({error:"Remote status unavailable"},{status:503});
  }
 }
+
+}
