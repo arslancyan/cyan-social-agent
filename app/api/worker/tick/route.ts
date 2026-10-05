@@ -5,12 +5,12 @@ import {publishDraft} from "@/lib/platforms";
 export const dynamic="force-dynamic";
 
 function authorized(req:NextRequest){
- const secret=process.env.CYAN_WORKER_SECRET;
+ const secret=process.env.CYAN_WORKER_SECRET||process.env.CRON_SECRET;
  if(!secret) return process.env.NODE_ENV!=="production";
  return req.headers.get("authorization")==="Bearer "+secret;
 }
 
-export async function POST(req:NextRequest){
+async function run(req:NextRequest){
  if(!authorized(req)) return NextResponse.json({error:"Unauthorized worker request"},{status:401});
  try{
   const control=await getControl();
@@ -36,3 +36,6 @@ export async function POST(req:NextRequest){
   return NextResponse.json({error:message},{status:500});
  }
 }
+
+export async function GET(req:NextRequest){return run(req);}
+export async function POST(req:NextRequest){return run(req);}
