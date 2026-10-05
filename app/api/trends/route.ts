@@ -1,9 +1,2 @@
-import {NextResponse} from "next/server";
-import {latestTrends} from "@/lib/store";
-
-export const dynamic="force-dynamic";
-
-export async function GET(){
- try{return NextResponse.json({trends:await latestTrends(10)})}
- catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Trend store unavailable"},{status:503})}
-}
+import {NextResponse} from "next/server";import {latestTrends} from "@/lib/store";import {requireUser,runAsUser} from "@/lib/auth";export const dynamic="force-dynamic";
+export async function GET(){try{const u=await requireUser();return NextResponse.json(await runAsUser(u,async()=>({trends:await latestTrends(10)})))}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}}
