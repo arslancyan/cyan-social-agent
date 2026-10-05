@@ -6,7 +6,7 @@ function rowToDraft(r:any):Draft{
  return {id:r.id,platform:r.platform,angle:r.angle,content:r.content,status:r.status,scheduledAt:r.scheduled_at?new Date(r.scheduled_at).toISOString():undefined,trendId:r.trend_id||undefined,protected:Boolean(r.protected),mediaUrl:r.media_url||undefined,mediaType:r.media_type||undefined,externalId:r.external_id||undefined,publishAttempts:Number(r.publish_attempts||0),publishStartedAt:r.publish_started_at?new Date(r.publish_started_at).toISOString():undefined};
 }
 
-export async function listDrafts():Promise<Draft[]>{
+export async function getDraft(id:string):Promise<Draft|undefined>{await dbReady();const r=await pool.query("SELECT * FROM cyan_drafts WHERE workspace_id=$1 AND id=$2 LIMIT 1",[workspaceId(),id]);return r.rows[0]?rowToDraft(r.rows[0]):undefined;}\nexport async function listDrafts():Promise<Draft[]>{
  await dbReady(); const r=await pool.query("SELECT * FROM cyan_drafts WHERE workspace_id=$1 ORDER BY COALESCE(scheduled_at, created_at) ASC, created_at DESC",[workspaceId()]); return r.rows.map(rowToDraft);
 }
 export async function saveDrafts(drafts:Draft[]){
