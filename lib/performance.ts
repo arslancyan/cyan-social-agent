@@ -39,7 +39,8 @@ export async function syncPublishedPerformance(drafts:Draft[]){
  await dbReady();const results:any[]=[];
  for(const draft of drafts){
   if(!draft.externalId||draft.status!=="published")continue;
-  const window=attributionWindow(draft.scheduledAt||new Date().toISOString());
+  const publishedAt=await pool.query("SELECT created_at FROM cyan_events WHERE workspace_id=$1 AND type='publish' AND draft_id=$2 ORDER BY created_at ASC LIMIT 1",[workspaceId(),draft.id]);
+  const window=attributionWindow(publishedAt.rows[0]?.created_at||new Date().toISOString());
   if(!window)continue;
   const recent=await pool.query("SELECT id FROM cyan_events WHERE workspace_id=$1 AND type='performance_snapshot' AND draft_id=$2 AND metadata->>'window'=$3 LIMIT 1",[workspaceId(),draft.id,window]);
   if(recent.rows.length)continue;
