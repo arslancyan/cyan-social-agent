@@ -13,14 +13,14 @@ export async function GET(req:NextRequest){
   const u=new URL(req.url);
   if(u.searchParams.get("error")){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.redirect(new URL("/?connection_error=TikTok",req.url));}
   const code=u.searchParams.get("code"),state=u.searchParams.get("state"),expected=c.get("cyan_tt_state")?.value,verifier=c.get("cyan_tt_verifier")?.value;
-  if(!code||!state||state!==expected||!verifier)return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400});
+  if(!code||!state||state!==expected||!verifier)c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400,headers:{"Cache-Control":"no-store"}});
   const key=process.env.TIKTOK_CLIENT_KEY,secret=process.env.TIKTOK_CLIENT_SECRET,redirect=process.env.TIKTOK_REDIRECT_URI;
-  if(!key||!secret||!redirect)return NextResponse.json({error:"TikTok OAuth is not configured."},{status:503});
+  if(!key||!secret||!redirect)return NextResponse.json({error:"TikTok OAuth is not configured."},{status:503,headers:{"Cache-Control":"no-store"}});
   const body=new URLSearchParams({client_key:key,client_secret:secret,code,grant_type:"authorization_code",redirect_uri:redirect,code_verifier:verifier});
   const response=await fetchWithTimeout("https://open.tiktokapis.com/v2/oauth/token/",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded","cache-control":"no-cache"},body});
-  if(!response.ok)return NextResponse.json({error:"TikTok token exchange failed."},{status:502});
+  if(!response.ok)return NextResponse.json({error:"TikTok token exchange failed."},{status:502,headers:{"Cache-Control":"no-store"}});
   const token=await response.json();
-  if(!token.access_token)return NextResponse.json({error:"TikTok did not return an access token."},{status:502});
+  if(!token.access_token)return NextResponse.json({error:"TikTok did not return an access token."},{status:502,headers:{"Cache-Control":"no-store"}});
   let label:string|undefined;
   const me=await fetchWithTimeout("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name",{headers:{authorization:"Bearer "+token.access_token}});
   if(me.ok){const d=await me.json();label=d.data?.user?.display_name||d.data?.display_name||undefined;}
