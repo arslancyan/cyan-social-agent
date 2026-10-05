@@ -18,7 +18,7 @@ function clean(input:any[],decision:AutonomyDecision):Draft[]{
   status:"review",
   trendId:decision.trend.id,
   mediaType:x.mediaType==="video"||x.mediaType==="image"?x.mediaType:undefined,
-  mediaUrl:typeof x.mediaUrl==="string"&&/^https?:\\/\\//i.test(x.mediaUrl)?x.mediaUrl:undefined,
+  mediaUrl:typeof x.mediaUrl==="string"&&/^https?:\/\//i.test(x.mediaUrl)?x.mediaUrl:undefined,
   ...(x.exploration?{exploration:true}:{} )
  }));
 }
