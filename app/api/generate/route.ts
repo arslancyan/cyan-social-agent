@@ -3,6 +3,7 @@ import {saveDrafts,latestTrends,learningSignals,recordEvent,contentFatigue} from
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
 import {Platform} from "@/lib/types";
 import {buildBrainContext,inspectDraft} from "@/lib/agent";
+import {adaptivePlan} from "@/lib/adaptive";
 function cleanDrafts(input:any[]):any[]{const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);return input.filter(x=>x&&allowed.has(x.platform)&&typeof x.content==="string"&&x.content.trim()).slice(0,6).map(x=>({id:x.id||crypto.randomUUID(),platform:x.platform,angle:typeof x.angle==="string"&&x.angle.trim()?x.angle.trim():"Draft",content:x.content.trim().slice(0,10000),status:"review"}));}
 function parseModelOutput(raw:string){const trimmed=raw.trim().replace(/^\`\`\`(?:json)?/i,"").replace(/\`\`\`$/,"").trim();try{return JSON.parse(trimmed)}catch{}const start=trimmed.indexOf("[");const end=trimmed.lastIndexOf("]");if(start>=0&&end>start){try{return JSON.parse(trimmed.slice(start,end+1))}catch{}}return []}
 export async function POST(req:Request){
@@ -44,7 +45,8 @@ export async function POST(req:Request){
    throw e;
   }
   const insights=drafts.map(d=>({id:d.id,platform:d.platform,analysis:inspectDraft(d.content,d.platform)}));
-  await runAsUser(user,()=>recordEvent("generation",{metadata:{source:apiKey?"ai":"fallback",trendId:trend?.id||null,draftCount:drafts.length,quality:insights.map((x:any)=>x.analysis.quality.score),risk:insights.map((x:any)=>x.analysis.risk.risk)}}));\n  return NextResponse.json({drafts,insights,source:apiKey?"ai":"fallback",trend:trend?{id:trend.id,title:trend.title,score:trend.score}:null,learning});
+  const adaptive=await runAsUser(user,()=>adaptivePlan(drafts));
+  await runAsUser(user,()=>recordEvent("generation",{metadata:{source:apiKey?"ai":"fallback",trendId:trend?.id||null,draftCount:drafts.length,quality:insights.map((x:any)=>x.analysis.quality.score),risk:insights.map((x:any)=>x.analysis.risk.risk)}}));\n  return NextResponse.json({drafts,insights,adaptive,source:apiKey?"ai":"fallback",trend:trend?{id:trend.id,title:trend.title,score:trend.score}:null,learning});
  }catch(e){
   const message=e instanceof Error?e.message:"Generation failed";
   if(message==="UNAUTHENTICATED")return NextResponse.json({error:"Please sign in again."},{status:401});
