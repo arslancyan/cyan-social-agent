@@ -63,6 +63,7 @@ async function run(req:NextRequest){
   for(const draft of due){
    const result=await publishDraft(draft);
    if(result.ok) await updateStatus(draft.id,"published");
+   else await updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString());
    results.push({id:draft.id,platform:draft.platform,ok:result.ok,message:result.message});
   }
   const processed=results.filter(r=>r.ok).length;
