@@ -7,16 +7,13 @@ export const dynamic="force-dynamic";
 export async function GET(){
  let db=false;
  let control={mode:"smart",paused:false,heartbeatAt:null as string|null};
- let dbError:string|undefined;
  if(process.env.DATABASE_URL||process.env.POSTGRES_URL||process.env.POSTGRES_PRISMA_URL||process.env.POSTGRES_URL_NON_POOLING){
   try{
    await dbReady();
    await pool.query("SELECT 1");
    control=await getControl();
    db=true;
-  }catch(e){
-   dbError=e instanceof Error?e.message:"Database check failed";
-  }
+  }catch{}
  }
  return NextResponse.json({
   name:"CYAN Social Agent",
