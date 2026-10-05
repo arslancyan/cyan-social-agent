@@ -25,8 +25,8 @@ export async function GET(){
   paused:control.paused,
   publishing:"official-api-only",
   agent:db,
-  scheduler:db,
-  trendWatch:db&&Boolean(process.env.TREND_SOURCE_URL),
+  scheduler:db&&Boolean(process.env.CYAN_WORKER_SECRET||process.env.CRON_SECRET),
+  trendWatch:db,
   lastHeartbeat:control.heartbeatAt||"not configured",
   infrastructure:db?"database connected":"database not configured/unreachable",
   ...(dbError?{databaseError:dbError}: {})
