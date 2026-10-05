@@ -4,7 +4,8 @@ import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/a
 
 export async function POST(req:Request){
  try{
-  const user=await requireUser();\n  if(!(await rateLimit("publish:"+user.id,30,60)))return NextResponse.json({error:"Publishing rate limit reached. Try again shortly."},{status:429});
+  const user=await requireUser();
+  if(!(await rateLimit("publish:"+user.id,30,60)))return NextResponse.json({error:"Publishing rate limit reached. Try again shortly."},{status:429});
   const b=await req.json().catch(()=>({}));
   if(!b.draft||typeof b.draft!=="object")return NextResponse.json({error:"draft required"},{status:400});
   const allowed=await consumeUsage(user,"publishes");
