@@ -39,8 +39,8 @@ export async function rankDecisionCandidates(trend:any, limit=12):Promise<Optimi
   const out:OptimizationCandidate[]=[];
   for(const p of platforms){
     const [angles,features,slots]=await Promise.all([anglePerformanceScores(p.platform),featurePerformanceScores(p.platform),timeSlotScores(p.platform)]);
-    const candidatesAngles=angles.length?angles.slice(0,4):[{angle:"Hook",score:55,confidence:0}];
-    const candidatesFeatures=features.length?features.slice(0,4):[{feature:"hook",value:"hook",score:55,confidence:0}];
+    const candidatesAngles:any[]=angles.length?angles.slice(0,4):[{angle:"Hook",score:55,confidence:0,samples:0}];
+    const candidatesFeatures:any[]=features.length?features.slice(0,4):[{feature:"hook",value:"hook",score:55,confidence:0,samples:0}];
     const candidatesSlots=slots.slice(0,4);
     const adaptation=adaptations.find(x=>x.platform===p.platform);
     for(const a of candidatesAngles)for(const f of candidatesFeatures.slice(0,2))for(const slot of candidatesSlots.slice(0,2)){
