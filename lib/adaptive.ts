@@ -38,7 +38,19 @@ export async function adaptivePlan(drafts:Draft[],now=new Date()){
  const candidates=await Promise.all(drafts.map(async d=>{const p=platforms.find(x=>x.platform===d.platform)!;const best=(await timeSlotScores(d.platform))[0],a=angleBy.get(d.angle),angleScore=a?.score??55,score=Math.round(p.score*.45+angleScore*.25+best.score*.30),confidence=Math.round((p.confidence+(a?.confidence||0)+best.confidence)/3);return{draftId:d.id,platform:d.platform,angle:d.angle,score,confidence,recommendedAt:nextOccurrence(best.day,best.hour,now,control.timezone).toISOString(),platformScore:p.score,angleScore,timeScore:best.score,reason:[p.reason,a?.reason||"No angle history; exploration recommended.",best.reason].join(" ")};}));
  return candidates.sort((a,b)=>b.score-a.score);
 }
-export async function chooseBestDecision(drafts:Draft[],now=new Date()){const plans=await adaptivePlan(drafts,now);if(!plans.length)return null;return plans.find(x=>x.confidence>=25)||plans[0];}
+export async function chooseBestDecision(drafts:Draft[],now=new Date()){
+ const plans=await adaptivePlan(drafts,now);if(!plans.length)return null;
+ const explore=plans.filter(x=>x.confidence<55).sort((a,b)=>a.confidence-b.confidence)[0];
+ const exploit=plans[0];
+ if(!explore)return exploit;
+ return explore.score>=exploit.score-8?explore:exploit;
+}
+export async function generationStrategy(now=new Date()){
+ const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores();
+ const bestPlatform=platforms[0],bestAngle=angles[0];
+ const lowConfidence=platforms.filter(x=>x.confidence<55).map(x=>x.platform);
+ return {bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
+}
 export async function autoScheduleAdaptive(draftIds:string[],mode:"smart"|"autonomous"){
  if(mode!=="autonomous")return{scheduled:[],skipped:"Autonomous mode required for automatic scheduling."};
  await dbReady();const r=await pool.query("SELECT * FROM cyan_drafts WHERE workspace_id=$1 AND id=ANY($2::text[]) AND status IN ('draft','review') AND protected=false",[workspaceId(),draftIds]);
