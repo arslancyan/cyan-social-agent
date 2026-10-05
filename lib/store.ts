@@ -1,4 +1,4 @@
-import {Draft,QueueStatus,PriorityMode} from "./types";
+import {Draft,QueueStatus,PriorityMode,Trend} from "./types";
 import {dbReady,pool} from "./db";
 
 const workspaceId=()=>process.env.CYAN_WORKSPACE_ID||"local";
@@ -31,6 +31,24 @@ export async function updateStatus(id:string,status:QueueStatus,scheduledAt?:str
  await dbReady();
  const r=await pool.query("UPDATE cyan_drafts SET status=$1, scheduled_at=$2 WHERE id=$3 AND workspace_id=$4 RETURNING *",[status,scheduledAt||null,id,workspaceId()]);
  return r.rows[0]?rowToDraft(r.rows[0]):undefined;
+}
+
+export async function saveTrends(trends:Trend[]){
+ await dbReady();
+ for(const t of trends){
+  await pool.query(`INSERT INTO cyan_trends(id,workspace_id,title,summary,source_url,score,views,velocity,relevance)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+   ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,summary=EXCLUDED.summary,source_url=EXCLUDED.source_url,
+   score=EXCLUDED.score,views=EXCLUDED.views,velocity=EXCLUDED.velocity,relevance=EXCLUDED.relevance`,
+   [t.id,workspaceId(),t.title,t.summary,t.sourceUrl||null,t.score,t.views||null,t.velocity||null,t.relevance||null]);
+ }
+ return trends;
+}
+
+export async function latestTrends(limit=20):Promise<Trend[]>{
+ await dbReady();
+ const r=await pool.query("SELECT id,title,summary,source_url,score,views,velocity,relevance,created_at FROM cyan_trends WHERE workspace_id=$1 ORDER BY score DESC, created_at DESC LIMIT $2",[workspaceId(),limit]);
+ return r.rows.map((x:any)=>({id:x.id,title:x.title,summary:x.summary,sourceUrl:x.source_url||undefined,score:Number(x.score),views:x.views?Number(x.views):undefined,velocity:x.velocity?Number(x.velocity):undefined,relevance:x.relevance?Number(x.relevance):undefined,createdAt:new Date(x.created_at).toISOString()}));
 }
 
 export async function dueDrafts(now=new Date()){
