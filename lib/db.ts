@@ -21,7 +21,7 @@ CREATE INDEX IF NOT EXISTS cyan_events_workspace_idx ON cyan_events(workspace_id
 CREATE INDEX IF NOT EXISTS cyan_events_platform_time_idx ON cyan_events(workspace_id,platform,created_at DESC);
 CREATE TABLE IF NOT EXISTS cyan_subscriptions(user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,provider TEXT NOT NULL DEFAULT 'none',customer_id TEXT NULL,subscription_id TEXT NULL,status TEXT NOT NULL DEFAULT 'inactive',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_stripe_events(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS cyan_drafts(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,angle TEXT NOT NULL,content TEXT NOT NULL,status TEXT NOT NULL,scheduled_at TIMESTAMPTZ NULL,trend_id TEXT NULL,protected BOOLEAN NOT NULL DEFAULT FALSE,media_url TEXT NULL,media_type TEXT NULL,external_id TEXT NULL,publish_attempts INTEGER NOT NULL DEFAULT 0,publish_started_at TIMESTAMPTZ NULL,features JSONB NOT NULL DEFAULT '{}'::jsonb,experiment_id TEXT NULL,variant TEXT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS cyan_drafts(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,angle TEXT NOT NULL,content TEXT NOT NULL,status TEXT NOT NULL,scheduled_at TIMESTAMPTZ NULL,trend_id TEXT NULL,protected BOOLEAN NOT NULL DEFAULT FALSE,media_url TEXT NULL,media_type TEXT NULL,external_id TEXT NULL,publish_attempts INTEGER NOT NULL DEFAULT 0,publish_started_at TIMESTAMPTZ NULL,features JSONB NOT NULL DEFAULT '{}'::jsonb,experiment_id TEXT NULL,variant TEXT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_url TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_type TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS external_id TEXT NULL;
@@ -30,6 +30,7 @@ ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS publish_started_at TIMESTAMPTZ 
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS features JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS experiment_id TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS variant TEXT NULL;
+ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS exploration BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(workspace_id,status,scheduled_at);
 CREATE TABLE IF NOT EXISTS cyan_experiments(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,topic TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),winner_draft_id TEXT NULL,winner_score NUMERIC NULL);
 CREATE INDEX IF NOT EXISTS cyan_experiments_workspace_idx ON cyan_experiments(workspace_id,created_at DESC);
