@@ -28,7 +28,12 @@ export async function POST(req:Request){
    drafts=cleanDrafts(parseModelOutput(String(data.output_text||"")));
    if(drafts.length===0){await releaseUsage(user,"generations");return NextResponse.json({error:"AI returned no valid drafts. Try a more specific topic."},{status:502});}
   }
-  await runAsUser(user,()=>saveDrafts(drafts));
+  try{
+   await runAsUser(user,()=>saveDrafts(drafts));
+  }catch(e){
+   await releaseUsage(user,"generations");
+   throw e;
+  }
   return NextResponse.json({drafts,source:apiKey?"ai":"fallback"});
  }catch(e){
   const message=e instanceof Error?e.message:"Generation failed";
