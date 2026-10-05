@@ -1,6 +1,7 @@
 import {consumeUsage,releaseUsage} from "./auth";
 import {buildBrainContext,inspectDraft} from "./agent";
-import {adaptivePlan,createExperiment,generationStrategy} from "./adaptive";
+import {createExperiment,generationStrategy} from "./adaptive";
+import {allocateAutonomousCalendar} from "./autonomous-calendar";
 import {contentFatigue,latestTrends,recordEvent,saveDrafts} from "./store";
 import {classifyContent} from "./content-intelligence";
 import {AutonomyDecision} from "./autonomy";
@@ -16,7 +17,8 @@ function clean(input:any[],decision:AutonomyDecision):Draft[]{
   content:x.content.trim().slice(0,10000),
   status:"review",
   trendId:decision.trend.id,
-  mediaType:x.mediaType==="video"||x.mediaType==="image"?x.mediaType:undefined
+  mediaType:x.mediaType==="video"||x.mediaType==="image"?x.mediaType:undefined,
+  ...(x.exploration?{exploration:true}:{} )
  }));
 }
 
@@ -60,16 +62,11 @@ export async function autonomousGenerate(user:any,decision:AutonomyDecision){
   if(!fresh.length)return{generated:0,scheduled:0,skipped:"Content fatigue protection rejected all candidates."};
   await saveDrafts(fresh);
   const experiment=await createExperiment(decision.topic,fresh);
-  const plans=await adaptivePlan(fresh);
-  const scheduled:any[]=[];
-  for(const p of plans){
-   if(p.score<65||p.confidence<25)continue;
-   const at=p.experimentId?new Date(new Date(p.recommendedAt).getTime()+(p.variant?["A","B","C","D"].indexOf(p.variant)*6*3600000:0)):new Date(p.recommendedAt);
-   const u=await pool.query("UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND status='review' AND protected=false RETURNING id,platform,scheduled_at",[at.toISOString(),(await import("./auth")).workspaceId(),p.draftId]);
-   if(u.rows[0])scheduled.push({draftId:p.draftId,platform:p.platform,scheduledAt:new Date(u.rows[0].scheduled_at).toISOString(),score:p.score,confidence:p.confidence});
-  }
-  await recordEvent("autonomous_generation",{metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,draftCount:fresh.length,scheduledCount:scheduled.length,experimentId:experiment?.id||null,priority:decision.priority,exploration:decision.exploration}});
-  return{generated:fresh.length,scheduled:scheduled.length,scheduledDrafts:scheduled,experiment};
+  const explorationIds=new Set(fresh.filter((d:any)=>d.exploration).map(d=>d.id));
+  const calendar=await allocateAutonomousCalendar(fresh,explorationIds);
+  const scheduled=calendar.scheduled;
+  await recordEvent("autonomous_generation",{metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,draftCount:fresh.length,scheduledCount:scheduled.length,experimentId:experiment?.id||null,priority:decision.priority,exploration:decision.exploration,allocation:calendar.allocation}});
+  return{generated:fresh.length,scheduled:scheduled.length,scheduledDrafts:scheduled,allocation:calendar.allocation,experiment};
  }catch(e){
   await releaseUsage(user,"generations");
   throw e;
