@@ -13,5 +13,5 @@ export async function POST(req:Request){
   const result=await runAsUser(user,()=>publishDraft(b.draft));
   if(!result.ok)await releaseUsage(user,"publishes");
   return NextResponse.json(result);
- }catch{return NextResponse.json({error:"Unauthorized"},{status:401})}
+ }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Publish API failed",e);return NextResponse.json({error:"Publishing service unavailable"},{status:503})}
 }
