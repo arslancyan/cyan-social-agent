@@ -1,0 +1,29 @@
+name: CYAN Worker
+
+on:
+  schedule:
+    - cron: "2/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run CYAN worker
+        env:
+          CYAN_APP_URL: ${{ vars.CYAN_APP_URL }}
+          CYAN_WORKER_SECRET: ${{ secrets.CYAN_WORKER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CYAN_APP_URL:-}" ]; then
+            echo "CYAN_APP_URL repository variable is not configured."
+            exit 1
+          fi
+          if [ -z "${CYAN_WORKER_SECRET:-}" ]; then
+            echo "CYAN_WORKER_SECRET repository secret is not configured."
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 50 \
+            -X POST "${CYAN_APP_URL%/}/api/worker/tick" \
+            -H "Authorization: Bearer ${CYAN_WORKER_SECRET}" \
+            -H "Accept: application/json"
