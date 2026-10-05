@@ -40,6 +40,10 @@ ALTER TABLE cyan_worker_runs ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL
 CREATE INDEX IF NOT EXISTS cyan_worker_runs_workspace_idx ON cyan_worker_runs(workspace_id,ran_at DESC);
 CREATE TABLE IF NOT EXISTS cyan_trends(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',title TEXT NOT NULL,summary TEXT NOT NULL,source_url TEXT NULL,score INTEGER NOT NULL DEFAULT 0,views BIGINT NULL,velocity NUMERIC NULL,relevance NUMERIC NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_connections(workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'not_connected',account_label TEXT NULL,access_token_enc TEXT NULL,refresh_token_enc TEXT NULL,connected_at TIMESTAMPTZ NULL,PRIMARY KEY(workspace_id,platform));
+CREATE TABLE IF NOT EXISTS cyan_patterns(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,pattern_type TEXT NOT NULL,pattern_key TEXT NOT NULL,score NUMERIC NOT NULL DEFAULT 50,confidence NUMERIC NOT NULL DEFAULT 0,samples INTEGER NOT NULL DEFAULT 0,successes INTEGER NOT NULL DEFAULT 0,failures INTEGER NOT NULL DEFAULT 0,first_observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),last_observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),metadata JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE UNIQUE INDEX IF NOT EXISTS cyan_patterns_workspace_type_key_idx ON cyan_patterns(workspace_id,pattern_type,pattern_key);
+CREATE INDEX IF NOT EXISTS cyan_patterns_workspace_score_idx ON cyan_patterns(workspace_id,score DESC,updated_at DESC);
+
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
 ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta';
