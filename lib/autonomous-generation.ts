@@ -60,9 +60,9 @@ export async function autonomousGenerate(user:any,decision:AutonomyDecision){
   if(!drafts.length)throw new Error("No valid autonomous drafts returned.");
   drafts=drafts.map(d=>({...d,features:classifyContent(d.content,d.platform,d.mediaType)}));
   const safe=drafts.filter(d=>{const i=inspectDraft(d.content,d.platform);return i.risk.risk==="low"&&i.quality.score>=60;});
-  if(!safe.length){await recordEvent("autonomous_generation",{metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,draftCount:drafts.length,accepted:0,reason:"quality_or_risk_gate"}});return{generated:0,scheduled:0,skipped:"All autonomous candidates failed quality/risk checks."};}
+  if(!safe.length){await releaseUsage(user,"generations");await recordEvent("autonomous_generation",{metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,draftCount:drafts.length,accepted:0,reason:"quality_or_risk_gate"}});return{generated:0,scheduled:0,skipped:"All autonomous candidates failed quality/risk checks."};}
   const fresh=await contentFatigue(safe);
-  if(!fresh.length)return{generated:0,scheduled:0,skipped:"Content fatigue protection rejected all candidates."};
+  if(!fresh.length){await releaseUsage(user,"generations");return{generated:0,scheduled:0,skipped:"Content fatigue protection rejected all candidates."};}
   await saveDrafts(fresh);
   const experiment=await createExperiment(decision.topic,fresh);
   const explorationIds=new Set(fresh.filter((d:any)=>d.exploration).map(d=>d.id));
