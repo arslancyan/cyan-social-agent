@@ -15,5 +15,5 @@ export async function GET(){
    const published=events.filter((x:any)=>x.type==="publish").reduce((n:number,x:any)=>n+Number(x.count||0),0);
    return {published,events,trend:{total:Number(trendStats.rows[0]?.total||0),high:Number(trendStats.rows[0]?.high||0),average:Number(trendStats.rows[0]?.avg||0)},usage:{generations:Number(usage.rows[0]?.generations||0),publishes:Number(usage.rows[0]?.publishes||0)}};
   }));
- }catch{return NextResponse.json({error:"Analytics unavailable"},{status:503});}
+ }catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Analytics API failed",e);return NextResponse.json({error:"Analytics unavailable"},{status:503});}
 }
