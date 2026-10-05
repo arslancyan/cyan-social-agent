@@ -7,7 +7,7 @@ export interface Trend{
 }
 export interface Draft{
  id:string; platform:Platform; angle:string; content:string;
- status:QueueStatus; scheduledAt?:string; trendId?:string; protected?:boolean;
+ status:QueueStatus; scheduledAt?:string; externalId?:string; trendId?:string; protected?:boolean;
  mediaUrl?:string; mediaType?:"video"|"image";
 }
 export interface PriorityDecision{
