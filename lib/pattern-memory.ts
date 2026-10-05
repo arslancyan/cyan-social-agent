@@ -49,7 +49,7 @@ export async function refreshPatternMemory(){
   if(m.variant)add("winner_variant",String(row.platform||"unknown")+"|"+String(m.variant),{metadata:{views:1},created_at:row.created_at},{platform:row.platform,variant:m.variant,winner:true});
  }
  for(const [id,g] of groups){
-  const [type,key]=id.split(/:(.*)/s);const s=weightedRows(g.rows);const samples=g.rows.length;
+  const [type,key]=id.split(/:(.*)/s); const patternId=hash(ws+"|"+type+"|"+key);const s=weightedRows(g.rows);const samples=g.rows.length;
   const successes=g.rows.filter(x=>{const m=x.metadata||{},impressions=Number(m.impressions||m.views||0),interactions=Number(m.likes||0)+Number(m.comments||0)*3+Number(m.shares||0)*4+Number(m.clicks||0)*2;return impressions>0&&interactions/impressions>=.03}).length;
   const failures=Math.max(0,samples-successes);
   const last=new Date(Math.max(...g.rows.map(x=>new Date(x.created_at).getTime())));
@@ -58,7 +58,7 @@ export async function refreshPatternMemory(){
   await pool.query(`INSERT INTO cyan_patterns(id,workspace_id,pattern_type,pattern_key,score,confidence,samples,successes,failures,first_observed_at,last_observed_at,metadata,updated_at)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
    ON CONFLICT(workspace_id,pattern_type,pattern_key) DO UPDATE SET score=EXCLUDED.score,confidence=EXCLUDED.confidence,samples=EXCLUDED.samples,successes=EXCLUDED.successes,failures=EXCLUDED.failures,first_observed_at=LEAST(cyan_patterns.first_observed_at,EXCLUDED.first_observed_at),last_observed_at=EXCLUDED.last_observed_at,metadata=EXCLUDED.metadata,updated_at=NOW()`,
-   [ws,ws,type,key,Math.round(s.score),Math.round(confidence),samples,successes,failures,first.toISOString(),last.toISOString(),JSON.stringify({...g.metadata,avgViews:Math.round(s.avgViews)})]);
+   [patternId,ws,type,key,Math.round(s.score),Math.round(confidence),samples,successes,failures,first.toISOString(),last.toISOString(),JSON.stringify({...g.metadata,avgViews:Math.round(s.avgViews)})]);
  }
  return topPatterns(30);
 }
