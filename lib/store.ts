@@ -135,3 +135,13 @@ export async function updateConnectionTokens(platform:string,accessTokenEnc:stri
  await dbReady();
  await pool.query("UPDATE cyan_connections SET access_token_enc=$1, refresh_token_enc=COALESCE($2,refresh_token_enc), status='connected' WHERE workspace_id=$3 AND platform=$4",[accessTokenEnc,refreshTokenEnc||null,workspaceId(),platform]);
 }
+
+export async function recordEvent(type:string,data:{platform?:string;draftId?:string;externalId?:string;metadata?:Record<string,unknown>}={}){
+ await dbReady();
+ await pool.query("INSERT INTO cyan_events(workspace_id,type,platform,draft_id,external_id,metadata) VALUES($1,$2,$3,$4,$5,$6)",[workspaceId(),type,data.platform||null,data.draftId||null,data.externalId||null,JSON.stringify(data.metadata||{})]);
+}
+export async function analyticsSummary(){
+ await dbReady();
+ const r=await pool.query("SELECT type,platform,COUNT(*)::int AS count FROM cyan_events WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days' GROUP BY type,platform ORDER BY count DESC",[workspaceId()]);
+ return r.rows;
+}
