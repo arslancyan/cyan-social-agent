@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {listAgentUsers,runAsUser} from "@/lib/auth";
-import {dueDrafts,getControl,heartbeat,latestTrends,recordWorker,reprioritizeSchedule,saveTrends,updateStatus} from "@/lib/store";
+import {dueDrafts,getControl,heartbeat,latestTrends,recordEvent,recordWorker,reprioritizeSchedule,saveTrends,updateStatus} from "@/lib/store";
 import {publishDraft} from "@/lib/platforms";
 import {scoreTrend} from "@/lib/scoring";
 import {Trend} from "@/lib/types";
@@ -56,8 +56,8 @@ async function run(req:NextRequest){
     const due=await dueDrafts();const results=[];
     for(const draft of due){
      const published=await publishDraft(draft);
-     if(published.ok) await updateStatus(draft.id,"published");
-     else await updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString());
+     if(published.ok){await updateStatus(draft.id,"published");await recordEvent("publish",{platform:draft.platform,draftId:draft.id,externalId:published.externalId});}
+     else {await updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString());await recordEvent("publish_failed",{platform:draft.platform,draftId:draft.id,metadata:{message:published.message}});}
      results.push({id:draft.id,platform:draft.platform,ok:published.ok,message:published.message});
     }
     const processed=results.filter(r=>r.ok).length,blocked=results.filter(r=>!r.ok).length;
