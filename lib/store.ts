@@ -100,3 +100,24 @@ export async function reprioritizeSchedule(trendId:string,viralScore:number,now=
  }
  return {changed,message:"Flexible scheduled posts moved to make room for the viral priority slot.",trendId};
 }
+
+export async function listConnections(){
+ await dbReady();
+ const r=await pool.query("SELECT platform,status,account_label,connected_at FROM cyan_connections WHERE workspace_id=$1 ORDER BY platform",[workspaceId()]);
+ return r.rows.map((x:any)=>({platform:x.platform,status:x.status,accountLabel:x.account_label||undefined,connectedAt:x.connected_at?new Date(x.connected_at).toISOString():undefined}));
+}
+
+export async function saveConnection(platform:string,accessTokenEnc:string,refreshTokenEnc:string,accountLabel?:string){
+ await dbReady();
+ await pool.query(`INSERT INTO cyan_connections(workspace_id,platform,status,account_label,access_token_enc,refresh_token_enc,connected_at)
+ VALUES($1,$2,'connected',$3,$4,$5,NOW())
+ ON CONFLICT(workspace_id,platform) DO UPDATE SET status='connected',account_label=EXCLUDED.account_label,
+ access_token_enc=EXCLUDED.access_token_enc,refresh_token_enc=EXCLUDED.refresh_token_enc,connected_at=NOW()`,
+ [workspaceId(),platform,accountLabel||null,accessTokenEnc,refreshTokenEnc]);
+}
+
+export async function getConnectionSecret(platform:string){
+ await dbReady();
+ const r=await pool.query("SELECT access_token_enc,refresh_token_enc,account_label,status FROM cyan_connections WHERE workspace_id=$1 AND platform=$2",[workspaceId(),platform]);
+ return r.rows[0]||null;
+}
