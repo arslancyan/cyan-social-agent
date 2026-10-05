@@ -47,6 +47,8 @@ export async function POST(req:Request){
   }
   const insights=drafts.map(d=>({id:d.id,platform:d.platform,analysis:inspectDraft(d.content,d.platform)}));
   const adaptive=await runAsUser(user,()=>adaptivePlan(drafts));
+  const chosen=adaptive[0]||null;
+  if(chosen)await runAsUser(user,()=>recordEvent("adaptive_decision",{platform:chosen.platform,draftId:chosen.draftId,metadata:{angle:chosen.angle,score:chosen.score,confidence:chosen.confidence,platformScore:chosen.platformScore,angleScore:chosen.angleScore,timeScore:chosen.timeScore,recommendedAt:chosen.recommendedAt}}));
   await runAsUser(user,()=>recordEvent("generation",{metadata:{source:apiKey?"ai":"fallback",trendId:trend?.id||null,draftCount:drafts.length,quality:insights.map((x:any)=>x.analysis.quality.score),risk:insights.map((x:any)=>x.analysis.risk.risk)}}));\n  return NextResponse.json({drafts,insights,adaptive,strategy,source:apiKey?"ai":"fallback",trend:trend?{id:trend.id,title:trend.title,score:trend.score}:null,learning});
  }catch(e){
   const message=e instanceof Error?e.message:"Generation failed";
