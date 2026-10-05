@@ -3,7 +3,7 @@ import {workspaceId} from "./auth";
 
 export async function evaluateExperiments(){
  await dbReady();
- const r=await pool.query(`SELECT e.id,e.topic,d.id AS draft_id,d.variant,
+ const r=await pool.query(`SELECT e.id,e.topic,d.id AS draft_id,d.variant,d.features,d.angle,
  MAX(CASE WHEN ev.metadata->>'window' IN ('24h','72h') THEN
  ((COALESCE((ev.metadata->>'likes')::numeric,0)+COALESCE((ev.metadata->>'comments')::numeric,0)+COALESCE((ev.metadata->>'shares')::numeric,0)+COALESCE((ev.metadata->>'clicks')::numeric,0))/GREATEST(COALESCE((ev.metadata->>'impressions')::numeric,1),1))*100 END) AS score
  FROM cyan_experiments e JOIN cyan_drafts d ON d.experiment_id=e.id
