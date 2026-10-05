@@ -40,7 +40,7 @@ export async function dbReady(){
    CREATE TABLE IF NOT EXISTS cyan_connections (
     workspace_id TEXT NOT NULL DEFAULT 'local', platform TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'not_connected',
-    account_label TEXT NULL, connected_at TIMESTAMPTZ NULL,
+    account_label TEXT NULL, access_token_enc TEXT NULL, refresh_token_enc TEXT NULL, connected_at TIMESTAMPTZ NULL,
     PRIMARY KEY(workspace_id, platform)
    );
   `);
