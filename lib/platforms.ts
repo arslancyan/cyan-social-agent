@@ -41,14 +41,30 @@ async function publishX(draft:Draft):Promise<PublishResult>{
   return{platform:"X",ok:true,message:"Published through the official X API.",externalId:data?.data?.id};
  }catch(e){return{platform:"X",ok:false,message:e instanceof Error?e.message:"X publishing failed."};}
 }
+async function refreshTikTok(refreshToken:string){
+ const key=process.env.TIKTOK_CLIENT_KEY,secret=process.env.TIKTOK_CLIENT_SECRET;
+ if(!key||!secret)throw new Error("TikTok OAuth credentials are not configured");
+ const body=new URLSearchParams({client_key:key,client_secret:secret,grant_type:"refresh_token",refresh_token:refreshToken});
+ const response=await fetchWithTimeout("https://open.tiktokapis.com/v2/oauth/token/",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded","cache-control":"no-cache"},body});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||!data.access_token)throw new Error(data?.error?.message||"TikTok token refresh failed");
+ return data;
+}
 async function publishTikTok(draft:Draft):Promise<PublishResult>{
  const connection=await getConnectionSecret("TikTok");
  if(!connection?.access_token_enc)return{platform:"TikTok",ok:false,message:"TikTok is not connected."};
  if(!draft.mediaUrl||draft.mediaType!=="video")return{platform:"TikTok",ok:false,message:"TikTok Direct Post needs a public video URL. Add a media URL to this scheduled post."};
  try{
-  const token=await decryptSecret(connection.access_token_enc);
+  let token=await decryptSecret(connection.access_token_enc);
+  const refresh=async()=>{
+   if(!connection.refresh_token_enc)throw new Error("TikTok access token expired and no refresh token is available. Reconnect TikTok.");
+   const refreshed=await refreshTikTok(await decryptSecret(connection.refresh_token_enc));
+   token=refreshed.access_token;
+   await updateConnectionTokens("TikTok",await encryptSecret(token),refreshed.refresh_token?await encryptSecret(refreshed.refresh_token):undefined);
+  };
   if(draft.externalId){
-   const statusResponse=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/status/fetch/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({publish_id:draft.externalId})});
+   let statusResponse=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/status/fetch/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({publish_id:draft.externalId})});
+   if(statusResponse.status===401){await refresh();statusResponse=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/status/fetch/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({publish_id:draft.externalId})});}
    const statusData=await statusResponse.json().catch(()=>({}));
    if(statusResponse.ok&&statusData?.error?.code==="ok"){
     const status=String(statusData?.data?.status||"");
@@ -57,7 +73,8 @@ async function publishTikTok(draft:Draft):Promise<PublishResult>{
    }
    return{platform:"TikTok",ok:false,pending:true,message:"TikTok is still processing the publish request.",externalId:draft.externalId};
   }
-  const creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"});
+  let creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"});
+  if(creator.status===401){await refresh();creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}");}
   const creatorData=await creator.json().catch(()=>({}));
   if(!creator.ok||creatorData?.error?.code!=="ok")return{platform:"TikTok",ok:false,message:creatorData?.error?.message||"TikTok creator information could not be queried."};
   const options=creatorData.data?.privacy_level_options||[];
