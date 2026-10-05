@@ -5,6 +5,7 @@ import {getConnectionSecret,recordEvent,updateConnectionTokens} from "./store";
 import {Draft,Platform} from "./types";
 
 type Metrics={views?:number;impressions?:number;likes?:number;comments?:number;shares?:number;clicks?:number;};
+function attributionWindow(createdAt:string){const age=(Date.now()-new Date(createdAt).getTime())/3600000;if(age<1)return null;if(age<6)return "1h";if(age<24)return "6h";if(age<72)return "24h";return "72h";}
 
 function safeMetric(v:any){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.min(10000000000,Math.floor(n)):0;}
 
@@ -38,12 +39,14 @@ export async function syncPublishedPerformance(drafts:Draft[]){
  await dbReady();const results:any[]=[];
  for(const draft of drafts){
   if(!draft.externalId||draft.status!=="published")continue;
-  const recent=await pool.query("SELECT id FROM cyan_events WHERE workspace_id=$1 AND type='performance_snapshot' AND draft_id=$2 AND created_at>=NOW()-INTERVAL '30 minutes' LIMIT 1",[workspaceId(),draft.id]);
+  const window=attributionWindow(draft.scheduledAt||new Date().toISOString());
+  if(!window)continue;
+  const recent=await pool.query("SELECT id FROM cyan_events WHERE workspace_id=$1 AND type='performance_snapshot' AND draft_id=$2 AND metadata->>'window'=$3 LIMIT 1",[workspaceId(),draft.id,window]);
   if(recent.rows.length)continue;
   let result:{ok:boolean;message:string;metrics?:Metrics}={ok:false,message:"Unsupported platform."};
   if(draft.platform==="X")result=await syncX(draft);
   if(!result.ok){results.push({draftId:draft.id,platform:draft.platform,ok:false,message:result.message});continue;}
-  await recordEvent("performance_snapshot",{platform:draft.platform,draftId:draft.id,externalId:draft.externalId,metadata:{...result.metrics,syncedAt:new Date().toISOString()}});
+  await recordEvent("performance_snapshot",{platform:draft.platform,draftId:draft.id,externalId:draft.externalId,metadata:{...result.metrics,window,syncedAt:new Date().toISOString()}});
   results.push({draftId:draft.id,platform:draft.platform,ok:true,metrics:result.metrics});
  }
  return results;
