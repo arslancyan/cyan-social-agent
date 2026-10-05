@@ -23,12 +23,13 @@ export async function allocateAutonomousCalendar(drafts:Draft[],explorationIds:S
  const counts=new Map<string,{exploration:number;total:number}>();
  for(const x of existing.rows){const key=String(x.platform);const v=counts.get(key)||{exploration:0,total:0};v.total++;counts.set(key,v);}
  const platformOrder=["X","TikTok","Instagram","Facebook"];
+ const totalExisting=existing.rows.length;
  for(const p of plans.filter(x=>x.score>=65&&x.confidence>=25)){
   const current=counts.get(p.platform)||{exploration:0,total:0};
   const allocation=explorationIds.has(p.draftId)?"exploration":"exploitation";
   const totalPlanned=chosen.length+1;
-  const minShare=totalPlanned>=4?Math.max(1,Math.floor(totalPlanned/Math.max(1,platformOrder.length))):0;
-  if(minShare&&current.total>=Math.ceil(totalPlanned*.6))continue;
+  const plannedCap=Math.max(1,Math.ceil(Math.max(4,totalExisting+chosen.length+1)*0.6));
+  if(current.total>=plannedCap)continue;
   let at=new Date(p.recommendedAt);
   let placed=false;
   for(let step=0;step<48;step++){
