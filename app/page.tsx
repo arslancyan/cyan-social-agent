@@ -8,6 +8,7 @@ type Trend={id:string;title:string;summary:string;score:number;views?:number;vel
 
 export default function Home(){
  const [status,setStatus]=useState<Status>({agent:false,scheduler:false,trendWatch:false,lastHeartbeat:"—"});
+ const [user,setUser]=useState<any>(null),[authReady,setAuthReady]=useState(false),[authMode,setAuthMode]=useState("login"),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[authLoading,setAuthLoading]=useState(false);
  const [mode,setMode]=useState("smart"),[paused,setPaused]=useState(false),[savingControl,setSavingControl]=useState(false);
  const [topic,setTopic]=useState("Crypto market story with a useful angle");
  const [loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]),[trends,setTrends]=useState<Trend[]>([]),[connections,setConnections]=useState<any[]>([]);
@@ -26,7 +27,10 @@ export default function Home(){
   try{const r=await fetch("/api/trends",{cache:"no-store"});const d=await r.json();if(r.ok)setTrends(d.trends||[])}catch{}
   try{const r=await fetch("/api/connections",{cache:"no-store"});const d=await r.json();if(r.ok)setConnections(d.connections||[])}catch{}
  }
- useEffect(()=>{refresh();const id=setInterval(refresh,30000);return()=>clearInterval(id)},[]);
+ useEffect(()=>{(async()=>{try{const r=await fetch("/api/auth/me",{cache:"no-store"});const d=await r.json();setUser(d.user||null)}finally{setAuthReady(true)}})()},[]);
+ useEffect(()=>{if(!user)return;refresh();const id=setInterval(refresh,30000);return()=>clearInterval(id)},[user]);
+ async function authenticate(){setAuthLoading(true);setError("");try{const r=await fetch(authMode==="login"?"/api/auth/login":"/api/auth/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Authentication failed");setUser(d.user)}catch(e){setError(e instanceof Error?e.message:"Authentication failed")}finally{setAuthLoading(false)}}
+ async function signOut(){await fetch("/api/auth/logout",{method:"POST"});setUser(null)}
 
  async function updateControl(next:{mode?:string;paused?:boolean}){
   setSavingControl(true);setError("");
@@ -49,10 +53,12 @@ export default function Home(){
    setManual("");setScheduled("");setProtectedPost(false);await refresh();
   }catch(e){setError(e instanceof Error?e.message:"Could not save post")}
  }
+ if(!authReady)return <main className="page"><div className="card authcard"><div className="mark">C</div><div className="eyebrow">CYAN SOCIAL AGENT</div><div className="hero">Loading secure control center…</div></div></main>;
+ if(!user)return <main className="page"><div className="authwrap"><div className="card authcard"><div className="brand"><div className="mark">C</div><div><strong>CYAN</strong><div className="muted">Social Agent</div></div></div><div className="hero">Your social media, on autopilot.</div><p className="muted">Sign in to control your cloud agent, schedules and connected accounts.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" type="email"/><input value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password (8+ characters)" type="password"/>{error&&<div className="error">{error}</div>}<button className="btn" onClick={authenticate} disabled={authLoading}>{authLoading?"Please wait…":authMode==="login"?"Sign in":"Create account"}</button><button className="btn ghost authswitch" onClick={()=>setAuthMode(authMode==="login"?"register":"login")}>{authMode==="login"?"Create a new account":"I already have an account"}</button></div></div></main>;
  return <main className="page">
   <header className="top">
    <div className="brand"><div className="mark">C</div><div><strong>CYAN</strong><div className="muted">Social Agent · Control Center</div></div></div>
-   <div className="top-actions"><span className="pill">REMOTE CONTROL</span><span className={"status "+(status.agent&&!paused?"online":"offline")}><i/> {paused?"AGENT PAUSED":status.agent?"AGENT ONLINE":"AGENT OFFLINE"}</span></div>
+   <div className="top-actions"><span className="pill">{user?.plan?.toUpperCase()||"FREE"}</span><span className="pill">REMOTE CONTROL</span><span className={"status "+(status.agent&&!paused?"online":"offline")}><i/> {paused?"AGENT PAUSED":status.agent?"AGENT ONLINE":"AGENT OFFLINE"}</span><button className="btn ghost" onClick={signOut}>Sign out</button></div>
   </header>
 
   <section className="controlbar">
