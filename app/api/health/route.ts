@@ -8,7 +8,7 @@ export async function GET(){
  let db=false;
  let control={mode:"smart",paused:false,heartbeatAt:null as string|null};
  let dbError:string|undefined;
- if(process.env.DATABASE_URL){
+ if(process.env.DATABASE_URL||process.env.POSTGRES_URL||process.env.POSTGRES_PRISMA_URL||process.env.POSTGRES_URL_NON_POOLING){
   try{
    await dbReady();
    await pool.query("SELECT 1");
