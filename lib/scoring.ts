@@ -1,0 +1,2 @@
+export function scoreTrend(input:{velocity:number;engagement:number;freshness:number;relevance:number}){const clamp=(n:number)=>Math.max(0,Math.min(100,n));return Math.round(clamp(input.velocity*.25+input.engagement*.3+input.freshness*.2+input.relevance*.25));}
+export function riskCheck(text:string){const claims=text.split(/[.!?]+/).filter(Boolean);const risky=/guaranteed|risk-free|insider|100%|will pump|buy now/i;return {risk:claims.some(c=>risky.test(c))?"high":"low",reason:"CYAN flags certainty-heavy or promotional claims for human review."};}
