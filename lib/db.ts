@@ -15,6 +15,25 @@ export async function dbReady(){
  if(globalThis.__cyanSchemaPromise) return globalThis.__cyanSchemaPromise;
  globalThis.__cyanSchemaPromise = (async()=>{
   await pool.query(`
+   CREATE TABLE IF NOT EXISTS cyan_users (
+    id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'free', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   );
+   CREATE TABLE IF NOT EXISTS cyan_sessions (
+    token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   );
+   CREATE INDEX IF NOT EXISTS cyan_sessions_exp_idx ON cyan_sessions(expires_at);
+   CREATE TABLE IF NOT EXISTS cyan_usage (
+    user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,
+    day DATE NOT NULL, generations INTEGER NOT NULL DEFAULT 0, publishes INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(user_id,day)
+   );
+   CREATE TABLE IF NOT EXISTS cyan_subscriptions (
+    user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL DEFAULT 'none', customer_id TEXT NULL, subscription_id TEXT NULL,
+    status TEXT NOT NULL DEFAULT 'inactive', updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   );
    CREATE TABLE IF NOT EXISTS cyan_drafts (
     id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT 'local',
     platform TEXT NOT NULL, angle TEXT NOT NULL, content TEXT NOT NULL,
