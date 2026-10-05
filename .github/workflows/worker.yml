@@ -8,9 +8,14 @@ on:
 permissions:
   id-token: write
 
+concurrency:
+  group: cyan-worker-production
+  cancel-in-progress: false
+
 jobs:
   tick:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - name: Run CYAN worker
         env:
