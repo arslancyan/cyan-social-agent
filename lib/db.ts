@@ -2,8 +2,9 @@ import {Pool} from "pg";
 
 declare global { var __cyanPool: Pool | undefined; var __cyanSchemaPromise: Promise<void> | undefined; }
 
+const databaseUrl=process.env.DATABASE_URL||process.env.POSTGRES_URL||process.env.POSTGRES_PRISMA_URL||process.env.POSTGRES_URL_NON_POOLING;
 const pool = globalThis.__cyanPool ?? new Pool({
- connectionString: process.env.DATABASE_URL,
+ connectionString: databaseUrl,
  max: Number(process.env.DB_POOL_MAX || 5),
  idleTimeoutMillis: 30_000,
  connectionTimeoutMillis: 5_000
@@ -11,7 +12,7 @@ const pool = globalThis.__cyanPool ?? new Pool({
 globalThis.__cyanPool = pool;
 
 export async function dbReady(){
- if(!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
+ if(!databaseUrl) throw new Error("Database connection is not configured. Set DATABASE_URL (or a supported Vercel Postgres/Neon connection variable).");
  if(globalThis.__cyanSchemaPromise) return globalThis.__cyanSchemaPromise;
  globalThis.__cyanSchemaPromise = (async()=>{
   await pool.query(`
