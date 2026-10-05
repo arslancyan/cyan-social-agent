@@ -12,7 +12,7 @@ const num=(v:any)=>Number.isFinite(Number(v))?Number(v):0;
 function weightedScore(rows:any[]){
  const samples=rows.length;if(!samples)return{score:50,confidence:0,samples:0,successRate:0,engagementRate:0,avgViews:0};
  let weight=0,eng=0,views=0,success=0;
- for(const r of rows){const age=Math.max(0,(Date.now()-new Date(r.created_at).getTime())/86400000),w=Math.max(.2,Math.exp(-age/21));weight+=w;const m=r.metadata||{},impressions=Math.max(0,num(m.impressions)),interactions=Math.max(0,num(m.likes)+num(m.comments)+num(m.shares)+num(m.saves)+num(m.clicks));eng+=w*(impressions?interactions/impressions:0);views+=w*Math.max(0,num(m.views||m.impressions));success+=w*(r.type==="publish"?1:0);}
+ for(const r of rows){const age=Math.max(0,(Date.now()-new Date(r.created_at).getTime())/86400000),w=Math.max(.2,Math.exp(-age/21));weight+=w;const m=r.metadata||{},impressions=Math.max(0,num(m.impressions)),interactions=Math.max(0,num(m.likes)+num(m.comments)+num(m.shares)+num(m.saves)+num(m.clicks));eng+=w*(impressions?interactions/impressions:0);views+=w*Math.max(0,num(m.views||m.impressions));success+=w*(r.type==="publish"||r.type==="performance_snapshot"?1:0);}
  const engagementRate=weight?eng/weight:0,avgViews=weight?views/weight:0,successRate=weight?success/weight:0,score=clamp(engagementRate*100*.55+Math.min(100,Math.log10(avgViews+1)*20)*.25+successRate*100*.20);
  return{score,confidence:clamp(samples/20*100),samples,successRate,engagementRate,avgViews};
 }
