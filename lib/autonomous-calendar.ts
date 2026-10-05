@@ -19,8 +19,6 @@ export async function allocateAutonomousCalendar(drafts:Draft[],explorationIds:S
  if(!plans.length)return{scheduled:[],plans:[],allocation:{exploitation:0,exploration:0}};
  const existing=await pool.query("SELECT platform,scheduled_at FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled' AND scheduled_at>=NOW() ORDER BY scheduled_at ASC LIMIT 100",[workspaceId()]);
  const occupied=new Set<string>(existing.rows.map((x:any)=>hourKey(new Date(x.scheduled_at),control.timezone)+":"+String(x.platform)));
- const platformRecent=await pool.query("SELECT platform,COUNT(*)::int AS count FROM cyan_drafts WHERE workspace_id=$1 AND status IN ('scheduled','published') AND created_at>=NOW()-INTERVAL '7 days' GROUP BY platform",[workspaceId()]);
- const counts=new Map<string,number>(platformRecent.rows.map((x:any)=>[String(x.platform),Number(x.count)]));
  const chosen:CalendarSlot[]=[];
  for(const p of plans.filter(x=>x.score>=65&&x.confidence>=25)){
   const allocation=explorationIds.has(p.draftId)?"exploration":"exploitation";
@@ -36,7 +34,6 @@ export async function allocateAutonomousCalendar(drafts:Draft[],explorationIds:S
   }
   if(!placed)continue;
   chosen.push({draftId:p.draftId,platform:p.platform,score:p.score,confidence:p.confidence,scheduledAt:at.toISOString(),allocation,reason:allocation==="exploration"?"Reserved as an exploration slot to gather new evidence.":"Allocated to the strongest learned platform/angle/time combination."});
-  counts.set(p.platform,(counts.get(p.platform)||0)+1);
  }
  for(const s of chosen){
   await pool.query("UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND status IN ('draft','review') AND protected=false",[s.scheduledAt,workspaceId(),s.draftId]);
