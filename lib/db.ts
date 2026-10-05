@@ -46,8 +46,6 @@ export async function dbReady(){
     status TEXT NOT NULL, scheduled_at TIMESTAMPTZ NULL, trend_id TEXT NULL,
     protected BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
-   ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
-   ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
    CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(status, scheduled_at);
    CREATE TABLE IF NOT EXISTS cyan_control (
     workspace_id TEXT PRIMARY KEY, mode TEXT NOT NULL DEFAULT 'smart',
@@ -70,6 +68,8 @@ export async function dbReady(){
     account_label TEXT NULL, access_token_enc TEXT NULL, refresh_token_enc TEXT NULL, connected_at TIMESTAMPTZ NULL,
     PRIMARY KEY(workspace_id, platform)
    );
+   ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
+   ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
   `);
  })().catch(err=>{ globalThis.__cyanSchemaPromise=undefined; throw err; });
  return globalThis.__cyanSchemaPromise;
