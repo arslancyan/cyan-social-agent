@@ -13,6 +13,7 @@ import {optimizeGrowth} from "@/lib/growth-optimizer";
 import {refreshPatternMemory} from "@/lib/pattern-memory";
 import {calibrateLearning} from "@/lib/self-optimization";
 import {evaluatePolicy,recordPolicyDecision} from "@/lib/policy-engine";
+import {lifecycleAudit} from "@/lib/lifecycle-audit";
 export const dynamic="force-dynamic";
 async function authorized(req:NextRequest){const secret=process.env.CYAN_WORKER_SECRET||process.env.CRON_SECRET;if(secret&&req.headers.get("authorization")==="Bearer "+secret)return true;const oidc=req.headers.get("x-github-oidc-token");if(!oidc)return process.env.NODE_ENV!=="production";try{const {createRemoteJWKSet,jwtVerify}=await import("jose");const issuer="https://token.actions.githubusercontent.com";const jwks=createRemoteJWKSet(new URL(issuer+"/.well-known/jwks"));const {payload}=await jwtVerify(oidc,jwks,{issuer,audience:process.env.GITHUB_OIDC_AUDIENCE||"https://cyan-social-agent.vercel.app"});return payload.repository==="arslancyan/cyan-social-agent"&&payload.ref==="refs/heads/main"&&payload.workflow_ref==="arslancyan/cyan-social-agent/.github/workflows/worker.yml@refs/heads/main";}catch{return false;}}
 async function pollGdelt(){const query=process.env.GDELT_TREND_QUERY||"(crypto OR bitcoin OR ethereum OR solana OR memecoin)";const url="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(query)+"&mode=artlist&format=json&maxrecords=50&timespan=1h";const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),8000);try{const r=await fetch(url,{cache:"no-store",headers:{accept:"application/json"},signal:controller.signal});if(!r.ok)throw new Error("GDELT returned "+r.status);const d=await r.json();const articles=Array.isArray(d.articles)?d.articles:[];const now=Date.now();const trends:Trend[]=articles.map((a:any,i:number)=>{const seen=String(a.seendate||"");const parsed=seen.length>=14?Date.parse(seen.slice(0,4)+"-"+seen.slice(4,6)+"-"+seen.slice(6,8)+"T"+seen.slice(8,10)+":"+seen.slice(10,12)+":"+seen.slice(12,14)+"Z"):now;const age=Math.max(0,(now-(Number.isNaN(parsed)?now:parsed))/3600000);const freshness=Math.max(10,100-age*25);const score=scoreTrend({velocity:Math.min(100,100-age*20),engagement:55,freshness,relevance:90,views:0});return{id:workspaceId()+"-gdelt-"+String(a.url||i),title:String(a.title||"Untitled"),summary:String(a.domain||"Global news")+" · GDELT news momentum",sourceUrl:typeof a.url==="string"?a.url:undefined,score,velocity:Math.min(100,100-age*20),relevance:90,createdAt:new Date().toISOString()};});await saveTrends(trends);return{fetched:trends.length,top:[...trends].sort((a,b)=>b.score-a.score)[0]||null};}finally{clearTimeout(timeout)}}
@@ -23,6 +24,7 @@ const performance=await syncPublishedPerformance(allDrafts.filter(d=>d.status===
 const experiments=await evolveExperiments();
 const patterns=await refreshPatternMemory();
 const learning=await calibrateLearning();
+const lifecycle=await lifecycleAudit();
 const exploration=await explorationBudget();
 const growth=await optimizeGrowth();
 const autonomousIdea=control.mode==="autonomous"?await chooseNextIdea():null;
