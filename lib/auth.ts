@@ -48,3 +48,16 @@ export function workspaceId(){const user=context.getStore();return user?.id||pro
 export function limits(plan:SessionUser["plan"]){
  return plan==="free"?{generations:10,publishes:10,accounts:1}:plan==="creator"?{generations:200,publishes:100,accounts:3}:plan==="pro"?{generations:600,publishes:500,accounts:10}:{generations:3000,publishes:3000,accounts:50};
 }
+
+export async function consumeUsage(user:SessionUser,type:"generations"|"publishes"){
+ await dbReady();
+ const l=limits(user.plan);
+ const column=type==="generations"?"generations":"publishes";
+ const limit=l[type];
+ const r=await pool.query(`SELECT ${column} AS used FROM cyan_usage WHERE user_id=$1 AND day=CURRENT_DATE`,[user.id]);
+ const used=Number(r.rows[0]?.used||0);
+ if(used>=limit) return false;
+ await pool.query(`INSERT INTO cyan_usage(user_id,day,${column}) VALUES($1,CURRENT_DATE,1)
+ ON CONFLICT(user_id,day) DO UPDATE SET ${column}=cyan_usage.${column}+1`,[user.id]);
+ return true;
+}
