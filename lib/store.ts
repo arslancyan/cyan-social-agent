@@ -1,7 +1,6 @@
 import {Draft,QueueStatus,PriorityMode,Trend} from "./types";
 import {dbReady,pool} from "./db";
-
-const workspaceId=()=>process.env.CYAN_WORKSPACE_ID||"local";
+import {workspaceId} from "./auth";
 
 function rowToDraft(r:any):Draft{
  return {id:r.id,platform:r.platform,angle:r.angle,content:r.content,status:r.status,scheduledAt:r.scheduled_at?new Date(r.scheduled_at).toISOString():undefined,trendId:r.trend_id||undefined,protected:Boolean(r.protected)};
