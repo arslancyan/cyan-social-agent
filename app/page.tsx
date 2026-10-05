@@ -10,7 +10,7 @@ export default function Home(){
  const [status,setStatus]=useState<Status>({agent:false,scheduler:false,trendWatch:false,lastHeartbeat:"—"});
  const [mode,setMode]=useState("smart"),[paused,setPaused]=useState(false),[savingControl,setSavingControl]=useState(false);
  const [topic,setTopic]=useState("Crypto market story with a useful angle");
- const [loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]),[trends,setTrends]=useState<Trend[]>([]);
+ const [loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]),[trends,setTrends]=useState<Trend[]>([]),[connections,setConnections]=useState<any[]>([]);
  const [manual,setManual]=useState(""),[manualPlatform,setManualPlatform]=useState("X"),[scheduled,setScheduled]=useState(""),[protectedPost,setProtectedPost]=useState(false),[error,setError]=useState("");
 
  async function refresh(){
@@ -24,6 +24,7 @@ export default function Home(){
   }catch{}
   try{const r=await fetch("/api/drafts",{cache:"no-store"});const d=await r.json();if(r.ok)setDrafts(d.drafts||[])}catch{}
   try{const r=await fetch("/api/trends",{cache:"no-store"});const d=await r.json();if(r.ok)setTrends(d.trends||[])}catch{}
+  try{const r=await fetch("/api/connections",{cache:"no-store"});const d=await r.json();if(r.ok)setConnections(d.connections||[])}catch{}
  }
  useEffect(()=>{refresh();const id=setInterval(refresh,30000);return()=>clearInterval(id)},[]);
 
@@ -79,6 +80,6 @@ export default function Home(){
 
   <section className="card" style={{marginTop:18}}><div className="sectionhead"><div><div className="eyebrow">REMOTE QUEUE</div><div className="title">Scheduled & generated content</div></div><button className="btn ghost" onClick={refresh}>Refresh</button></div>{error&&<div className="error">{error}</div>}<div className="queue" style={{marginTop:10}}>{drafts.length===0?<div className="muted">No queued posts yet.</div>:drafts.slice(0,12).map(d=><div className="queueitem" key={d.id}><div><strong>{d.platform}</strong><div style={{marginTop:6}}>{d.content}</div><div className="muted mini">{d.scheduledAt?new Date(d.scheduledAt).toLocaleString():"Draft"} · {d.status}{d.protected?" · protected":""}</div></div><span className="pill">{d.angle}</span></div>)}</div></section>
 
-  <section className="card integrations"><div className="eyebrow">ACCOUNT CONNECTIONS</div><div className="hero small">Official OAuth/API connections will live here.</div><div className="connectgrid">{["X","Instagram","TikTok","Facebook"].map(p=><div className="connection" key={p}><span className="platformdot">{p[0]}</span><div><strong>{p}</strong><div className="muted">Not connected</div></div><button className="btn ghost" disabled>Connect</button></div>)}</div><p className="muted mini">No passwords. CYAN will use official authorization scopes and platform APIs only.</p></section>
+  <section className="card integrations"><div className="eyebrow">ACCOUNT CONNECTIONS</div><div className="hero small">Connect your own social accounts. CYAN never needs your password.</div><div className="connectgrid">{["X","Instagram","TikTok","Facebook"].map(p=>{const c=connections.find((x:any)=>x.platform===p);return <div className="connection" key={p}><span className="platformdot">{p[0]}</span><div><strong>{p}</strong><div className="muted">{c?.status==="connected"?(c.accountLabel||"Connected"):"Not connected"}</div></div>{p==="X"?<button className="btn ghost" onClick={()=>window.location.href="/api/connect/x"}>{c?.status==="connected"?"Reconnect":"Connect X"}</button>:<button className="btn ghost" disabled>Coming next</button>}</div>})}</div><p className="muted mini">X is the first live connector. OAuth 2.0 PKCE is used, and access/refresh tokens are encrypted at rest.</p></section>
  </main>;
 }
