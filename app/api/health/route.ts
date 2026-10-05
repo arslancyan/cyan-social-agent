@@ -30,6 +30,5 @@ export async function GET(){
   trendWatch:db,
   lastHeartbeat:control.heartbeatAt||"not configured",
   infrastructure:db?"database connected":"database not configured/unreachable",
-  ...(dbError?{databaseError:dbError}: {})
  },{status:db?200:503});
 }
