@@ -30,7 +30,7 @@ export async function GET(){
  try{
   const user=await requireUser();
   return NextResponse.json(await runAsUser(user,async()=>{
-   const [events,trendStats,usage,content,features,growth,budget]=await Promise.all([
+   const [events,trendStats,usage,content,features,growth,budget,memory,patterns]=await Promise.all([
     analyticsSummary(),
     pool.query("SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE score>=85)::int AS high, COALESCE(ROUND(AVG(score)),0)::int AS avg FROM cyan_trends WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days'",[user.id]),
     pool.query("SELECT COALESCE(SUM(generations),0)::int AS generations,COALESCE(SUM(publishes),0)::int AS publishes FROM cyan_usage WHERE user_id=$1 AND day>=CURRENT_DATE-INTERVAL '29 days'",[user.id]),
