@@ -67,12 +67,14 @@ async function syncTikTok(draft:Draft):Promise<{ok:boolean;message:string;metric
 export async function performanceSources():Promise<PerformanceSource[]>{
  await dbReady();
  const connections=await pool.query("SELECT platform,status,connected_at FROM cyan_connections WHERE workspace_id=$1",[workspaceId()]);
+ const synced=await pool.query("SELECT platform,MAX(created_at) AS last_synced_at FROM cyan_events WHERE workspace_id=$1 AND type='performance_snapshot' GROUP BY platform",[workspaceId()]);
+ const lastBy=new Map(synced.rows.map((r:any)=>[String(r.platform),r.last_synced_at]));
  const by=new Map(connections.rows.map((r:any)=>[String(r.platform),r]));
  const platforms:Platform[]=["X","TikTok","Instagram","Facebook"];
  return platforms.map(platform=>{
   const c=by.get(platform);
-  if(!c||c.status!=="connected")return{platform,connected:false,supported:platform==="X"||platform==="TikTok",status:"not_connected",message:platform==="Instagram"||platform==="Facebook"?"Official performance connector is not enabled yet.":"Connect the official account to begin performance learning."};
-  return{platform,connected:true,supported:platform==="X"||platform==="TikTok",status:platform==="X"||platform==="TikTok"?"live":"not_supported",message:platform==="X"||platform==="TikTok"?"Official API performance sync is enabled.":"Account is connected, but official performance sync is not enabled yet.",lastSyncedAt:undefined};
+  if(!c||c.status!=="connected")return{platform,connected:false,supported:platform==="X"||platform==="TikTok",status:"not_connected",message:platform==="Instagram"||platform==="Facebook"?"Official performance connector is not enabled yet.":"Connect the official account to begin performance learning.",lastSyncedAt:lastBy.get(platform)?new Date(lastBy.get(platform)).toISOString():undefined};
+  return{platform,connected:true,supported:platform==="X"||platform==="TikTok",status:platform==="X"||platform==="TikTok"?"live":"not_supported",message:platform==="X"||platform==="TikTok"?"Official API performance sync is enabled.":"Account is connected, but official performance sync is not enabled yet.",lastSyncedAt:lastBy.get(platform)?new Date(lastBy.get(platform)).toISOString():undefined};
  });
 }
 
