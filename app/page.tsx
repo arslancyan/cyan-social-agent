@@ -4,12 +4,13 @@ import {useEffect,useState} from "react";
 
 type Status={agent:boolean;scheduler:boolean;trendWatch:boolean;lastHeartbeat:string};
 type Draft={id:string;platform:string;content:string;angle:string;status:string;scheduledAt?:string;protected?:boolean};
+type Trend={id:string;title:string;summary:string;score:number;views?:number;velocity?:number};
 
 export default function Home(){
  const [status,setStatus]=useState<Status>({agent:false,scheduler:false,trendWatch:false,lastHeartbeat:"—"});
  const [mode,setMode]=useState("smart"),[paused,setPaused]=useState(false),[savingControl,setSavingControl]=useState(false);
  const [topic,setTopic]=useState("Crypto market story with a useful angle");
- const [loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]);
+ const [loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]),[trends,setTrends]=useState<Trend[]>([]);
  const [manual,setManual]=useState(""),[manualPlatform,setManualPlatform]=useState("X"),[scheduled,setScheduled]=useState(""),[protectedPost,setProtectedPost]=useState(false),[error,setError]=useState("");
 
  async function refresh(){
@@ -22,6 +23,7 @@ export default function Home(){
    if(r.ok){setMode(d.mode||"smart");setPaused(Boolean(d.paused))}
   }catch{}
   try{const r=await fetch("/api/drafts",{cache:"no-store"});const d=await r.json();if(r.ok)setDrafts(d.drafts||[])}catch{}
+  try{const r=await fetch("/api/trends",{cache:"no-store"});const d=await r.json();if(r.ok)setTrends(d.trends||[])}catch{}
  }
  useEffect(()=>{refresh();const id=setInterval(refresh,30000);return()=>clearInterval(id)},[]);
 
@@ -70,6 +72,8 @@ export default function Home(){
    <div className="card"><div className="eyebrow">AI CONTENT ENGINE</div><div className="hero">Turn live stories into platform-native content.</div><p className="muted">Discover → Verify → Score → Generate → Adapt → Review → Schedule → Publish → Analyze.</p><div className="title">Topic / source summary</div><textarea value={topic} onChange={e=>setTopic(e.target.value)} rows={4}/><button className="btn" onClick={generate} disabled={loading}>{loading?"Generating…":"Generate content"}</button></div>
    <div className="card"><div className="eyebrow">PRIORITY ENGINE</div><div className="hero small">Viral events can interrupt flexible schedules.</div><div className="metrics"><div className="metric"><strong>1M+</strong><span>views trigger</span></div><div className="metric"><strong>90</strong><span>viral score</span></div></div><div className="row"><span>Protected posts</span><span className="pill">LOCKED</span></div><div className="row"><span>Current mode</span><span className="pill">{mode.toUpperCase()}</span></div></div>
   </section>
+
+  <section className="card" style={{marginTop:18}}><div className="sectionhead"><div><div className="eyebrow">LIVE TRENDS</div><div className="hero small">The latest scored signals stored by the cloud worker.</div></div><span className="pill">{trends.length?"FEED ACTIVE":"FEED PENDING"}</span></div><div className="trendlist" style={{marginTop:14}}>{trends.length===0?<div className="muted">Connect a trend feed via TREND_SOURCE_URL to activate continuous monitoring.</div>:trends.slice(0,5).map(t=><div className="trenditem" key={t.id}><div><strong>{t.title}</strong><div className="muted mini">{t.summary||"No summary provided."}</div></div><span className="pill">{t.score}</span></div>)}</div></section>
 
   <section className="card" style={{marginTop:18}}><div className="eyebrow">MANUAL POST</div><div className="hero small">Write it yourself. CYAN can publish it later without keeping this page open.</div><div className="controls"><select value={manualPlatform} onChange={e=>setManualPlatform(e.target.value)}><option>X</option><option>Instagram</option><option>Facebook</option><option>TikTok</option></select><input type="datetime-local" value={scheduled} onChange={e=>setScheduled(e.target.value)}/></div><textarea value={manual} onChange={e=>setManual(e.target.value)} placeholder="Write a post…" rows={4}/><label className="check muted"><input type="checkbox" checked={protectedPost} onChange={e=>setProtectedPost(e.target.checked)}/> Protect this post from viral schedule shifts</label><button className="btn secondary" onClick={saveManual}>Save to calendar</button></section>
 
