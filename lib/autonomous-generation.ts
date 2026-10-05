@@ -2,7 +2,7 @@ import {consumeUsage,releaseUsage} from "./auth";
 import {buildBrainContext,inspectDraft} from "./agent";
 import {createExperiment,generationStrategy} from "./adaptive";
 import {allocateAutonomousCalendar} from "./autonomous-calendar";
-import {contentFatigue,latestTrends,recordEvent,saveDrafts} from "./store";
+import {contentFatigue,recordEvent,saveDrafts} from "./store";
 import {classifyContent} from "./content-intelligence";
 import {AutonomyDecision} from "./autonomy";
 import {dbReady,pool} from "./db";
