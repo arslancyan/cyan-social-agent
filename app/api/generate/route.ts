@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     method: "POST",
     headers: { "content-type": "application/json", "authorization": auth },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-5.6",
+      model: process.env.OPENAI_MODEL || "gpt-6-luna",
       input: prompt
     })
   });
