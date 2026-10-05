@@ -31,7 +31,8 @@ export async function evolveExperiments(){
   const winner=measured[0];
   const runner=measured[1];
   const gap=Number(winner.score)-Number(runner.score);
-  const confidence=Math.min(100,25+measured.length*20+Math.max(0,gap)*2);
+  const maturityBonus=measured.filter(x=>x.m72).length*10+measured.filter(x=>x.m24).length*5;
+  const confidence=Math.min(100,20+measured.length*15+maturityBonus+Math.max(0,gap)*2);
   if(confidence<55)continue;
   const u=await pool.query("UPDATE cyan_experiments SET status='completed',winner_draft_id=$1,winner_score=$2 WHERE workspace_id=$3 AND id=$4 AND status='active' RETURNING id",[winner.draft_id,winner.score,ws,experimentId]);
   if(!u.rowCount)continue;
@@ -39,7 +40,7 @@ export async function evolveExperiments(){
   for(const loser of unpublishedLosers){
    await pool.query("UPDATE cyan_drafts SET status='review',scheduled_at=NULL WHERE workspace_id=$1 AND id=$2 AND status='scheduled' AND protected=false",[ws,loser.draft_id]);
   }
-  await recordEvent("experiment_winner",{platform:winner.platform,draftId:winner.draft_id,metadata:{experimentId,topic:rows[0].topic,score:winner.score,variant:winner.variant,confidence,exploration:Boolean(winner.exploration),runnerUpScore:runner.score}});
+  await recordEvent("experiment_winner",{platform:winner.platform,draftId:winner.draft_id,metadata:{experimentId,topic:rows[0].topic,score:winner.score,variant:winner.variant,confidence,exploration:Boolean(winner.exploration),runnerUpScore:runner.score,scoreGap:gap,maturity:winner.m72?"72h":winner.m24?"24h":"early"}});
   results.push({experimentId,topic:rows[0].topic,winnerDraftId:winner.draft_id,winnerScore:Number(winner.score),confidence,variants:rows.length,unscheduledLosers:unpublishedLosers.length});
  }
  return results;
