@@ -56,8 +56,11 @@ export async function optimizeGrowth(limit=20){
    const next=new Date(Math.max(Date.now()+2*60*60*1000,new Date(row.scheduled_at).getTime()+90*60*1000));
    await pool.query("UPDATE cyan_drafts SET scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND protected=false AND status='scheduled'",[next.toISOString(),ws,row.id]);
   }else if(action==="promote" && row.status==="scheduled" && row.scheduled_at){
-   const next=new Date(Math.max(Date.now()+15*60*1000,Date.now()+15*60*1000));
-   await pool.query("UPDATE cyan_drafts SET scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND protected=false AND status='scheduled'",[next.toISOString(),ws,row.id]);
+   const collision=await pool.query("SELECT 1 FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled' AND id<>$2 AND scheduled_at BETWEEN NOW()+INTERVAL '10 minutes' AND NOW()+INTERVAL '70 minutes' LIMIT 1",[ws,row.id]);
+   if(collision.rowCount===0){
+    const next=new Date(Date.now()+15*60*1000);
+    await pool.query("UPDATE cyan_drafts SET scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND protected=false AND status='scheduled'",[next.toISOString(),ws,row.id]);
+   }
   }
 
   decisions.push({draftId:row.id,platform:row.platform,action,score,confidence,reason,scheduledAt:row.scheduled_at||undefined});
