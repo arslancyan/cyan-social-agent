@@ -38,6 +38,7 @@ export async function PATCH(req:Request){
   const b=await req.json().catch(()=>({}));
   if(typeof b.id!=="string"||b.id.length>200||typeof b.status!=="string"||!["draft","review","scheduled"].includes(b.status))return NextResponse.json({error:"Invalid draft update"},{status:400});
   if(b.status==="scheduled"&&(typeof b.scheduledAt!=="string"||Number.isNaN(Date.parse(b.scheduledAt))))return NextResponse.json({error:"Scheduled posts require a valid scheduledAt"},{status:400});
+  if(b.status==="scheduled"&&new Date(b.scheduledAt).getTime()<=Date.now())return NextResponse.json({error:"scheduledAt must be in the future"},{status:400});
   if(b.status!=="scheduled"&&b.scheduledAt!==undefined&&b.scheduledAt!==null&&Number.isNaN(Date.parse(b.scheduledAt)))return NextResponse.json({error:"Invalid scheduledAt"},{status:400});
   return NextResponse.json(await runAsUser(u,async()=>{const draft=await updateStatus(b.id,b.status,b.scheduledAt);return draft?{draft}:{error:"Draft not found"}}))
  }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Draft PATCH failed",e);return NextResponse.json({error:"Draft service unavailable"},{status:503})}
