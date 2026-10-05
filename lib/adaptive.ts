@@ -52,7 +52,10 @@ export async function generationStrategy(now=new Date()){
  const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),features=await featurePerformanceScores();
  const bestPlatform=platforms[0],bestAngle=angles[0];
  const lowConfidence=platforms.filter(x=>x.confidence<55).map(x=>x.platform);
- return {bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,topFeatures:features.slice(0,8),explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
+ await dbReady();
+ const winners=await pool.query("SELECT d.platform,d.angle,d.features,e.metadata,e.created_at FROM cyan_events e JOIN cyan_drafts d ON d.id=e.draft_id AND d.workspace_id=e.workspace_id WHERE e.workspace_id=$1 AND e.type='experiment_winner' ORDER BY e.created_at DESC LIMIT 20",[workspaceId()]);
+ const winnerPatterns=winners.rows.map((x:any)=>({platform:x.platform,angle:x.angle,features:x.features||{},score:Number(x.metadata?.score||0),createdAt:new Date(x.created_at).toISOString()}));
+ return {bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,topFeatures:features.slice(0,8),winnerPatterns,explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
 }
 export async function autoScheduleAdaptive(draftIds:string[],mode:"smart"|"autonomous"){
  if(mode!=="autonomous")return{scheduled:[],skipped:"Autonomous mode required for automatic scheduling."};
