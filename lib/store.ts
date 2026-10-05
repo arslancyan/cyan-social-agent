@@ -51,11 +51,21 @@ export async function latestTrends(limit=20):Promise<Trend[]>{
  return r.rows.map((x:any)=>({id:x.id,title:x.title,summary:x.summary,sourceUrl:x.source_url||undefined,score:Number(x.score),views:x.views?Number(x.views):undefined,velocity:x.velocity?Number(x.velocity):undefined,relevance:x.relevance?Number(x.relevance):undefined,createdAt:new Date(x.created_at).toISOString()}));
 }
 
-export async function dueDrafts(now=new Date()){
+export async function claimDueDrafts(now=new Date()){
  await dbReady();
- const r=await pool.query("SELECT * FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled' AND scheduled_at <= $2 ORDER BY scheduled_at ASC LIMIT 20",[workspaceId(),now.toISOString()]);
- return r.rows.map(rowToDraft);
+ const client=await pool.connect();
+ try{
+  await client.query("BEGIN");
+  const selected=await client.query("SELECT id FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled' AND scheduled_at <= $2 ORDER BY scheduled_at ASC FOR UPDATE SKIP LOCKED LIMIT 20",[workspaceId(),now.toISOString()]);
+  if(selected.rows.length===0){await client.query("COMMIT");return [];}
+  const ids=selected.rows.map((x:any)=>x.id);
+  const updated=await client.query("UPDATE cyan_drafts SET status='publishing' WHERE workspace_id=$1 AND id=ANY($2::text[]) RETURNING *",[workspaceId(),ids]);
+  await client.query("COMMIT");
+  return updated.rows.map(rowToDraft);
+ }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
 }
+
+export async function dueDrafts(now=new Date()){ return claimDueDrafts(now); }
 
 export async function setControl(patch:{mode?:PriorityMode;paused?:boolean}){
  await dbReady();
