@@ -121,3 +121,8 @@ export async function getConnectionSecret(platform:string){
  const r=await pool.query("SELECT access_token_enc,refresh_token_enc,account_label,status FROM cyan_connections WHERE workspace_id=$1 AND platform=$2",[workspaceId(),platform]);
  return r.rows[0]||null;
 }
+
+export async function updateConnectionTokens(platform:string,accessTokenEnc:string,refreshTokenEnc?:string){
+ await dbReady();
+ await pool.query("UPDATE cyan_connections SET access_token_enc=$1, refresh_token_enc=COALESCE($2,refresh_token_enc), status='connected' WHERE workspace_id=$3 AND platform=$4",[accessTokenEnc,refreshTokenEnc||null,workspaceId(),platform]);
+}
