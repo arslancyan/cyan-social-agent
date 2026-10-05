@@ -45,6 +45,11 @@ export async function dbReady(){
     provider TEXT NOT NULL DEFAULT 'none', customer_id TEXT NULL, subscription_id TEXT NULL,
     status TEXT NOT NULL DEFAULT 'inactive', updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
+   CREATE TABLE IF NOT EXISTS cyan_stripe_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   );
    CREATE TABLE IF NOT EXISTS cyan_drafts (
     id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT 'local',
     platform TEXT NOT NULL, angle TEXT NOT NULL, content TEXT NOT NULL,
