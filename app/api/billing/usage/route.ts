@@ -1,0 +1,3 @@
+import {NextResponse} from "next/server";import {requireUser,limits} from "@/lib/auth";import {dbReady,pool} from "@/lib/db";
+export const dynamic="force-dynamic";
+export async function GET(){try{const u=await requireUser();await dbReady();const r=await pool.query("SELECT generations,publishes FROM cyan_usage WHERE user_id=$1 AND day=CURRENT_DATE",[u.id]);const row=r.rows[0]||{generations:0,publishes:0};return NextResponse.json({plan:u.plan,limits:limits(u.plan),used:{generations:Number(row.generations||0),publishes:Number(row.publishes||0)}})}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}}
