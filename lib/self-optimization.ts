@@ -88,6 +88,16 @@ export async function calibrateLearning():Promise<{updates:number;averageError:n
   return {updates:count,averageError,bias:meanBias};
 }
 
+export async function combinationMemory(){
+  await dbReady();
+  const r=await pool.query(`SELECT d.platform,d.angle,d.features,e.metadata,e.created_at
+    FROM cyan_events e JOIN cyan_drafts d ON d.id=e.draft_id AND d.workspace_id=e.workspace_id
+    WHERE e.workspace_id=$1 AND e.type='performance_snapshot' AND e.created_at>=NOW()-INTERVAL '90 days' LIMIT 4000`,[workspaceId()]);
+  const groups=new Map<string,any[]>();
+  for(const row of r.rows){const f=row.features||{};const key=String(row.platform)+"|"+String(row.angle)+"|"+String(f.format||"unknown");if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(row);}
+  return [...groups.entries()].map(([key,rows])=>{let weighted=0,weight=0;for(const row of rows){const m=row.metadata||{};const impressions=Math.max(1,num(m.impressions||m.views));const interactions=num(m.likes)+num(m.comments)*3+num(m.shares)*4+num(m.clicks)*2;const score=clamp(interactions/impressions*1000);const age=Math.max(0,(Date.now()-new Date(row.created_at).getTime())/86400000);const w=Math.max(.2,Math.exp(-age/45));weighted+=score*w;weight+=w;}const [platform,angle,format]=key.split("|");return{platform,angle,format,score:Math.round(weight?weighted/weight:50),samples:rows.length,confidence:Math.round(Math.min(100,rows.length*7))};}).sort((a,b)=>b.score-b.score);
+}
+
 export async function optimizationStatus(){
   await dbReady();
   const [patterns,adaptations,learning]=await Promise.all([topPatterns(20),platformAdaptationPlans(),calibrateLearning()]);
