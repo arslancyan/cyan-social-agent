@@ -10,6 +10,7 @@ export async function getDraft(id:string):Promise<Draft|undefined>{await dbReady
 export async function listDrafts():Promise<Draft[]>{
  await dbReady(); const r=await pool.query("SELECT * FROM cyan_drafts WHERE workspace_id=$1 ORDER BY COALESCE(scheduled_at, created_at) ASC, created_at DESC",[workspaceId()]); return r.rows.map(rowToDraft);
 }
+export async function contentFatigue(drafts:Draft[]){await dbReady();const r=await pool.query("SELECT platform,content FROM cyan_drafts WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days' ORDER BY created_at DESC LIMIT 100",[workspaceId()]);const normalize=(s:string)=>new Set(s.toLowerCase().replace(/https?:\\/\\/\\S+/g," ").replace(/[^a-z0-9\\s]/g," ").split(/\\s+/).filter(w=>w.length>2));const similarity=(a:Set<string>,b:Set<string>)=>{let hit=0;for(const x of a)if(b.has(x))hit++;return hit/Math.max(1,Math.min(a.size,b.size));};return drafts.filter(d=>{const words=normalize(d.content);return !r.rows.some((x:any)=>String(x.platform)===d.platform&&similarity(words,normalize(String(x.content||"")))>0.82);});}
 export async function saveDrafts(drafts:Draft[]){
  await dbReady();
  for(const d of drafts){await pool.query(`INSERT INTO cyan_drafts(id,workspace_id,platform,angle,content,status,scheduled_at,trend_id,protected,media_url,media_type,external_id,publish_attempts,publish_started_at)
