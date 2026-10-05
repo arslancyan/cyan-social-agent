@@ -10,5 +10,5 @@ export async function POST(req:NextRequest){
   await dbReady();const r=await pool.query("SELECT id,email,password_hash,plan FROM cyan_users WHERE email=$1",[email]);const u=r.rows[0];
   if(!u||!verifyPassword(password,u.password_hash))return NextResponse.json({error:"Invalid email or password"},{status:401});
   const user={id:u.id,email:u.email,plan:u.plan};await createSession(user);return NextResponse.json({user:{id:user.id,email:user.email,plan:user.plan}});
- }catch{return NextResponse.json({error:"Login failed"},{status:400})}
+ }catch(e){console.error("Login failed",e);return NextResponse.json({error:"Authentication service unavailable"},{status:503})}
 }
