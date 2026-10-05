@@ -3,9 +3,10 @@ import {requireUser,runAsUser,rateLimit} from "@/lib/auth";
 import {listDrafts} from "@/lib/store";
 import {adaptivePlan,autoScheduleAdaptive,platformPerformanceScores,timeSlotScores,anglePerformanceScores,chooseBestDecision,generationStrategy} from "@/lib/adaptive";
 import {performanceSources} from "@/lib/performance";
+import {optimizationStatus,portfolioPlan} from "@/lib/self-optimization";
 export const dynamic="force-dynamic";
 export async function GET(){
- try{const user=await requireUser();return NextResponse.json(await runAsUser(user,async()=>{const drafts=(await listDrafts()).filter(d=>d.status==="draft"||d.status==="review");return {platforms:await platformPerformanceScores(),angles:await anglePerformanceScores(),drafts:await adaptivePlan(drafts),bestDecision:await chooseBestDecision(drafts),generationStrategy:await generationStrategy(),performanceSources:await performanceSources()};}));}
+ try{const user=await requireUser();return NextResponse.json(await runAsUser(user,async()=>{const drafts=(await listDrafts()).filter(d=>d.status==="draft"||d.status==="review");return {platforms:await platformPerformanceScores(),angles:await anglePerformanceScores(),drafts:await adaptivePlan(drafts),bestDecision:await chooseBestDecision(drafts),generationStrategy:await generationStrategy(),performanceSources:await performanceSources(),optimization:await optimizationStatus(),portfolio:await portfolioPlan()};}));}
  catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});return NextResponse.json({error:"Adaptive scoring unavailable"},{status:503});}
 }
 export async function POST(req:Request){
