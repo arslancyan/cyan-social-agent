@@ -3,6 +3,7 @@ import {workspaceId} from "./auth";
 import {getControl} from "./store";
 import {Draft,Platform} from "./types";
 import {classifyContent} from "./content-intelligence";
+import {topPatterns,patternHealth} from "./pattern-memory";
 
 type PlatformScore={platform:Platform;score:number;confidence:number;samples:number;published:number;successRate:number;engagementRate:number;avgViews:number;reason:string};
 type SlotScore={platform:Platform;hour:number;day:number;score:number;confidence:number;samples:number;reason:string};
@@ -61,13 +62,15 @@ export async function crossPlatformIntelligence(){
 }
 
 export async function generationStrategy(now=new Date()){
- const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),features=await featurePerformanceScores(),crossPlatform=await crossPlatformIntelligence();
+ const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),features=await featurePerformanceScores(),crossPlatform=await crossPlatformIntelligence(),patterns=await topPatterns(40),memory=await patternHealth();
+ const patternByKey=new Map(patterns.map(x=>[x.patternType+"|"+x.patternKey,x]));
+ const enrichedCrossPlatform=crossPlatform.map(x=>{const p=patternByKey.get("platform_angle|"+x.platform+"|"+x.angle);const bonus=p?Math.min(8,Math.max(0,(p.score-50)*0.12)):0;return {...x,score:Math.round(Math.min(100,x.score+bonus)),memoryBonus:Math.round(bonus)};}).sort((a,b)=>b.score-a.score);
  const bestPlatform=platforms[0],bestAngle=angles[0];
  const lowConfidence=platforms.filter(x=>x.confidence<55).map(x=>x.platform);
  await dbReady();
  const winners=await pool.query("SELECT d.platform,d.angle,d.features,e.metadata,e.created_at FROM cyan_events e JOIN cyan_drafts d ON d.id=e.draft_id AND d.workspace_id=e.workspace_id WHERE e.workspace_id=$1 AND e.type='experiment_winner' ORDER BY e.created_at DESC LIMIT 20",[workspaceId()]);
  const winnerPatterns=winners.rows.map((x:any)=>({platform:x.platform,angle:x.angle,features:x.features||{},score:Number(x.metadata?.score||0),createdAt:new Date(x.created_at).toISOString()}));
- return {crossPlatform:crossPlatform.slice(0,12),bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,topFeatures:features.slice(0,8),winnerPatterns,explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
+ return {crossPlatform:enrichedCrossPlatform.slice(0,12),creativeMemory:memory,topPatterns:patterns.slice(0,15),bestPlatform:bestPlatform?.platform||null,bestPlatformScore:bestPlatform?.score||50,bestAngle:bestAngle?.angle||null,bestAngleScore:bestAngle?.score||50,topFeatures:features.slice(0,8),winnerPatterns,explorePlatforms:lowConfidence,explorationRatio:lowConfidence.length?0.35:0.15,generatedAt:now.toISOString()};
 }
 export async function autoScheduleAdaptive(draftIds:string[],mode:"smart"|"autonomous"){
  if(mode!=="autonomous")return{scheduled:[],skipped:"Autonomous mode required for automatic scheduling."};
