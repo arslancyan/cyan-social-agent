@@ -5,6 +5,9 @@ on:
     - cron: "2/5 * * * *"
   workflow_dispatch:
 
+permissions:
+  id-token: write
+
 jobs:
   tick:
     runs-on: ubuntu-latest
@@ -12,18 +15,20 @@ jobs:
       - name: Run CYAN worker
         env:
           CYAN_APP_URL: ${{ vars.CYAN_APP_URL }}
-          CYAN_WORKER_SECRET: ${{ secrets.CYAN_WORKER_SECRET }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${CYAN_APP_URL:-}" ]; then
             echo "CYAN_APP_URL repository variable is not configured."
             exit 1
           fi
-          if [ -z "${CYAN_WORKER_SECRET:-}" ]; then
-            echo "CYAN_WORKER_SECRET repository secret is not configured."
-            exit 1
-          fi
+          oidc_token="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H "Accept: application/json; api-version=2.0" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${CYAN_APP_URL%/}")"
+          token="$(printf '%s' "$oidc_token" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           curl --fail --silent --show-error --max-time 50 \
             -X POST "${CYAN_APP_URL%/}/api/worker/tick" \
-            -H "Authorization: Bearer ${CYAN_WORKER_SECRET}" \
+            -H "x-github-oidc-token: ${token}" \
             -H "Accept: application/json"
