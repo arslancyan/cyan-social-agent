@@ -12,7 +12,7 @@ export async function listDrafts():Promise<Draft[]>{
 export async function saveDrafts(drafts:Draft[]){
  await dbReady();
  for(const d of drafts){await pool.query(`INSERT INTO cyan_drafts(id,workspace_id,platform,angle,content,status,scheduled_at,trend_id,protected,media_url,media_type,external_id,publish_attempts,publish_started_at)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
  ON CONFLICT(id) DO UPDATE SET content=EXCLUDED.content,status=EXCLUDED.status,scheduled_at=EXCLUDED.scheduled_at,trend_id=EXCLUDED.trend_id,protected=EXCLUDED.protected,media_url=EXCLUDED.media_url,media_type=EXCLUDED.media_type,external_id=EXCLUDED.external_id,publish_attempts=EXCLUDED.publish_attempts,publish_started_at=EXCLUDED.publish_started_at`,[d.id,workspaceId(),d.platform,d.angle,d.content,d.status,d.scheduledAt||null,d.trendId||null,Boolean(d.protected),d.mediaUrl||null,d.mediaType||null,d.externalId||null,Number(d.publishAttempts||0),d.publishStartedAt||null]);}
  return drafts;
 }
