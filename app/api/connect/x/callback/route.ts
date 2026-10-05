@@ -1,3 +1,4 @@
+async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeoutMs=10000){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);try{return await fetch(input,{...init,signal:controller.signal});}finally{clearTimeout(timer);}}
 import {NextRequest,NextResponse} from "next/server";
 import {cookies} from "next/headers";
 import {encryptSecret} from "@/lib/crypto";
@@ -17,12 +18,12 @@ export async function GET(req:NextRequest){
  const auth=secret?Buffer.from(clientId+":"+secret).toString("base64"):undefined;
  const headers:Record<string,string>={"content-type":"application/x-www-form-urlencoded"};
  if(auth) headers.authorization="Basic "+auth;
- const tokenResponse=await fetch("https://api.x.com/2/oauth2/token",{method:"POST",headers,body});
+ const tokenResponse=await fetchWithTimeout("https://api.x.com/2/oauth2/token",{method:"POST",headers,body});
  if(!tokenResponse.ok) return NextResponse.json({error:"X token exchange failed"},{status:502});
  const token=await tokenResponse.json();
  if(!token.access_token) return NextResponse.json({error:"X did not return an access token"},{status:502});
  let label:string|undefined;
- const me=await fetch("https://api.x.com/2/users/me",{headers:{authorization:"Bearer "+token.access_token}});
+ const me=await fetchWithTimeout("https://api.x.com/2/users/me",{headers:{authorization:"Bearer "+token.access_token}});
  if(me.ok){const d=await me.json();label=d.data?.username?("@"+d.data.username):d.data?.name;}
  const accessToken=await encryptSecret(token.access_token);
  const refreshToken=token.refresh_token?await encryptSecret(token.refresh_token):"";
