@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {publishDraft} from "@/lib/platforms";
-import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";\nimport {getDraft} from "@/lib/store";
+import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
+import {getDraft} from "@/lib/store";
 
 export async function POST(req:Request){
  try{
