@@ -43,6 +43,14 @@ export async function evolveExperiments(){
  return results;
 }
 
+export async function experimentHealth(){
+ await dbReady();
+ const r=await pool.query(`SELECT status,COUNT(*)::int count,AVG(EXTRACT(EPOCH FROM (NOW()-created_at))/3600)::numeric avg_age_hours
+ FROM cyan_experiments WHERE workspace_id=$1 GROUP BY status`,[workspaceId()]);
+ const stale=await pool.query(`SELECT COUNT(*)::int count FROM cyan_experiments WHERE workspace_id=$1 AND status='active' AND created_at<NOW()-INTERVAL '5 days'`,[workspaceId()]);
+ return {statuses:r.rows,staleActive:Number(stale.rows[0]?.count||0)};
+}
+
 export async function explorationBudget(){
  await dbReady();
  const r=await pool.query(`SELECT
