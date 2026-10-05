@@ -6,30 +6,23 @@ type GrowthAction="protect"|"promote"|"delay"|"retire"|"explore"|"hold";
 type GrowthDecision={draftId:string;platform:string;action:GrowthAction;score:number;confidence:number;reason:string;scheduledAt?:string};
 
 function metricScore(m:any){
- const views=Number(m.views||m.impressions||0);
- const likes=Number(m.likes||0), comments=Number(m.comments||0), shares=Number(m.shares||0), clicks=Number(m.clicks||0);
- if(views<=0)return 0;
- return Math.min(100,Math.round((likes*1+comments*3+shares*4+clicks*2)/Math.max(views,1)*1000));
+ const views=Number(m?.views||m?.impressions||0); if(views<=0)return 0;
+ const likes=Number(m?.likes||0),comments=Number(m?.comments||0),shares=Number(m?.shares||0),clicks=Number(m?.clicks||0);
+ return Math.min(100,Math.round((likes+comments*3+shares*4+clicks*2)/views*1000));
 }
 
 export async function optimizeGrowth(limit=20){
  await dbReady();
  const ws=workspaceId();
  const r=await pool.query(`
- SELECT d.id,d.platform,d.status,d.protected,d.scheduled_at,d.content,d.angle,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='1h' THEN e.metadata->>'views' END),'0')::numeric AS v1,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='6h' THEN e.metadata->>'views' END),'0')::numeric AS v6,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='24h' THEN e.metadata->>'views' END),'0')::numeric AS v24,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='72h' THEN e.metadata->>'views' END),'0')::numeric AS v72,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='1h' THEN e.metadata END),'{}'::jsonb) AS m1,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='6h' THEN e.metadata END),'{}'::jsonb) AS m6,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='24h' THEN e.metadata END),'{}'::jsonb) AS m24,
-   COALESCE(MAX(CASE WHEN e.metadata->>'window'='72h' THEN e.metadata END),'{}'::jsonb) AS m72
+ SELECT d.id,d.platform,d.status,d.protected,d.scheduled_at,
+   (SELECT metadata FROM cyan_events e WHERE e.workspace_id=d.workspace_id AND e.draft_id=d.id AND e.type='performance_snapshot' AND e.metadata->>'window'='1h' ORDER BY e.created_at DESC LIMIT 1) m1,
+   (SELECT metadata FROM cyan_events e WHERE e.workspace_id=d.workspace_id AND e.draft_id=d.id AND e.type='performance_snapshot' AND e.metadata->>'window'='6h' ORDER BY e.created_at DESC LIMIT 1) m6,
+   (SELECT metadata FROM cyan_events e WHERE e.workspace_id=d.workspace_id AND e.draft_id=d.id AND e.type='performance_snapshot' AND e.metadata->>'window'='24h' ORDER BY e.created_at DESC LIMIT 1) m24,
+   (SELECT metadata FROM cyan_events e WHERE e.workspace_id=d.workspace_id AND e.draft_id=d.id AND e.type='performance_snapshot' AND e.metadata->>'window'='72h' ORDER BY e.created_at DESC LIMIT 1) m72
  FROM cyan_drafts d
- LEFT JOIN cyan_events e ON e.workspace_id=d.workspace_id AND e.draft_id=d.id AND e.type='performance_snapshot'
- WHERE d.workspace_id=$1 AND d.status IN ('scheduled','published','review','draft')
- GROUP BY d.id
- ORDER BY COALESCE(d.scheduled_at,d.id) ASC LIMIT $2`,[ws,limit]);
+ WHERE d.workspace_id=$1 AND d.status IN ('scheduled','review','draft')
+ ORDER BY COALESCE(d.scheduled_at,NOW()) ASC,d.created_at DESC LIMIT $2`,[ws,limit]);
 
  const decisions:GrowthDecision[]=[];
  for(const row of r.rows){
@@ -46,7 +39,8 @@ export async function optimizeGrowth(limit=20){
 
   let action:GrowthAction="hold";
   let reason="Insufficient signal to change the current lifecycle.";
-  if(windows.length>=2 && score>=70){
+  if(windows.length>=3 && score<=15){action="retire";reason="Repeated mature underperformance; automatic publishing is stopped and the draft returns to review.";
+  }else if(windows.length>=2 && score>=70){
    action="promote"; reason="Strong early and mature performance; move this flexible post closer to the next available priority slot.";
   }else if(windows.length>=2 && score<=25){
    action="delay"; reason="Repeated weak performance; reduce priority and give stronger patterns more room.";
