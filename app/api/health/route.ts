@@ -26,6 +26,7 @@ export async function GET(){
   publishing:"official-api-only",
   agent:db,
   scheduler:db&&Boolean(process.env.CYAN_WORKER_SECRET||process.env.CRON_SECRET),
+  githubWorker:true,
   trendWatch:db,
   lastHeartbeat:control.heartbeatAt||"not configured",
   infrastructure:db?"database connected":"database not configured/unreachable",
