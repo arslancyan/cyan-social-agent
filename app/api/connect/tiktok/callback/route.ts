@@ -13,7 +13,7 @@ export async function GET(req:NextRequest){
   const u=new URL(req.url);
   if(u.searchParams.get("error")){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.redirect(new URL("/?connection_error=TikTok",req.url));}
   const code=u.searchParams.get("code"),state=u.searchParams.get("state"),expected=c.get("cyan_tt_state")?.value,verifier=c.get("cyan_tt_verifier")?.value;
-  if(!code||!state||state!==expected||!verifier)c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400,headers:{"Cache-Control":"no-store"}});
+  if(!code||!state||state!==expected||!verifier){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400,headers:{"Cache-Control":"no-store"}});}
   const key=process.env.TIKTOK_CLIENT_KEY,secret=process.env.TIKTOK_CLIENT_SECRET,redirect=process.env.TIKTOK_REDIRECT_URI;
   if(!key||!secret||!redirect)return NextResponse.json({error:"TikTok OAuth is not configured."},{status:503,headers:{"Cache-Control":"no-store"}});
   const body=new URLSearchParams({client_key:key,client_secret:secret,code:code!,grant_type:"authorization_code",redirect_uri:redirect,code_verifier:verifier});
