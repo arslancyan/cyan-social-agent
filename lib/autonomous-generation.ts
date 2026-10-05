@@ -39,6 +39,8 @@ async function cooldown(){
 export async function autonomousGenerate(user:any,decision:AutonomyDecision){
  if(decision.priority<70||!decision.trend.sourceUrl)return {generated:0,scheduled:0,skipped:"Trend is below the autonomous threshold or has no source URL."};
  if(await cooldown())return {generated:0,scheduled:0,skipped:"Autonomous generation cooldown is active."};
+ const capacity=await pool.query("SELECT COUNT(*)::int count FROM cyan_drafts WHERE workspace_id=$1 AND status IN ('review','scheduled','publishing')",[await import("./auth").then(x=>x.workspaceId())]);
+ if(Number(capacity.rows[0]?.count||0)>=50)return {generated:0,scheduled:0,skipped:"Autonomous queue capacity guard is active."};
  const allowed=await consumeUsage(user,"generations");
  if(!allowed)return {generated:0,scheduled:0,skipped:"Daily generation limit reached."};
  const apiKey=process.env.OPENAI_API_KEY;
