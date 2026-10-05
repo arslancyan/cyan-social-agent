@@ -33,3 +33,21 @@ npm run dev
 ```
 
 Required environment variables are documented in `.env.example`.
+
+
+## Social connections
+
+X is the first live publishing adapter. The dashboard starts an OAuth 2.0 PKCE flow, exchanges the authorization code, encrypts the returned access/refresh tokens with AES-GCM, and stores only the encrypted values in PostgreSQL. Publishing uses the official X API endpoint; CYAN does not store or request the user's X password. X documents OAuth 2.0 PKCE as a supported user-token flow.
+
+Required X variables:
+- `X_CLIENT_ID`
+- `X_CLIENT_SECRET` (when the X app is configured as a confidential client)
+- `X_REDIRECT_URI`
+- `CYAN_TOKEN_ENCRYPTION_KEY` — 32 random bytes, base64 encoded
+
+For a production SaaS, the next security layer is user authentication and tenant isolation so every workspace has its own identity, connections, queue and quotas. The current repository still uses `CYAN_WORKSPACE_ID` as the workspace boundary while that layer is being built.
+
+## Deployment
+
+The repository includes a Vercel Cron entry for `/api/worker/tick`. Vercel supports cron-triggered Functions; current Vercel documentation notes that minute-level cron precision is available on Pro/Enterprise, while Hobby has lower scheduling precision. For a 24/7 social agent that needs frequent trend checks, deploy the production worker on an appropriate plan or a dedicated worker service.
+
