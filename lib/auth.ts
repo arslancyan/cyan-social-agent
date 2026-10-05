@@ -61,3 +61,9 @@ export async function consumeUsage(user:SessionUser,type:"generations"|"publishe
  ON CONFLICT(user_id,day) DO UPDATE SET ${column}=cyan_usage.${column}+1`,[user.id]);
  return true;
 }
+
+export async function listAgentUsers(){
+ await dbReady();
+ const r=await pool.query("SELECT id,email,plan FROM cyan_users ORDER BY created_at ASC");
+ return r.rows as SessionUser[];
+}
