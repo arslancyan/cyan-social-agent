@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {saveDrafts,latestTrends} from "@/lib/store";
+import {saveDrafts,latestTrends,learningSignals,recordEvent} from "@/lib/store";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
 import {Platform} from "@/lib/types";
 import {buildBrainContext,inspectDraft} from "@/lib/agent";
@@ -18,7 +18,7 @@ export async function POST(req:Request){
   let drafts:any[]=[];
   let trend:any=null;
   await runAsUser(user,async()=>{if(trendId){const trends=await latestTrends(20);trend=trends.find(t=>t.id===trendId)||null;}});
-  const context=buildBrainContext(topic);
+  const context=buildBrainContext(topic);\n  const learning=await runAsUser(user,()=>learningSignals());
   const trendContext=trend?["Verified trend signal:",trend.title,trend.summary,trend.sourceUrl?"Source: "+trend.sourceUrl:"","Score: "+trend.score].filter(Boolean).join("\n"):"No verified trend signal was supplied.";
   const apiKey=process.env.OPENAI_API_KEY;
   if(!apiKey){
@@ -28,7 +28,7 @@ export async function POST(req:Request){
     {platform:"Instagram",angle:"Carousel",content:"Slide 1: The story. Slide 2: What happened. Slide 3: Why it matters. Slide 4: What to watch next."}
    ]);
   }else{
-   const prompt=["You are CYAN, a responsible social media agent.","Create original platform-native drafts from the supplied topic and verified signal.","Never invent facts, statistics, quotes, events or sources.","Separate verified facts from interpretation.","Avoid guaranteed returns, insider claims, pump language, or pressure to buy.","Return ONLY a JSON array. No markdown fences.","Each item must contain platform, angle, content.","Platforms: X, TikTok, Instagram.","CYAN workflow:",context.workflow,"Platform guidance:",JSON.stringify(context.platforms),"Safety:",context.safety,"Topic:",topic,trendContext.trim()].join("\n");
+   const prompt=["You are CYAN, a responsible social media agent.","Create original platform-native drafts from the supplied topic and verified signal.","Never invent facts, statistics, quotes, events or sources.","Separate verified facts from interpretation.","Avoid guaranteed returns, insider claims, pump language, or pressure to buy.","Return ONLY a JSON array. No markdown fences.","Each item must contain platform, angle, content.","Platforms: X, TikTok, Instagram.","CYAN workflow:",context.workflow,"Platform guidance:",JSON.stringify(context.platforms),"Recent workspace learning signals (use only as optimization hints, never as facts):",JSON.stringify(learning),"Safety:",context.safety,"Topic:",topic,trendContext.trim()].join("\n");
    const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+apiKey},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5.6-luna",input:prompt})});
    if(!response.ok){await releaseUsage(user,"generations");return NextResponse.json({error:"AI provider request failed"},{status:502});}
    const data=await response.json();
@@ -42,7 +42,7 @@ export async function POST(req:Request){
    throw e;
   }
   const insights=drafts.map(d=>({id:d.id,platform:d.platform,analysis:inspectDraft(d.content,d.platform)}));
-  return NextResponse.json({drafts,insights,source:apiKey?"ai":"fallback",trend:trend?{id:trend.id,title:trend.title,score:trend.score}:null});
+  await runAsUser(user,()=>recordEvent("generation",{metadata:{source:apiKey?"ai":"fallback",trendId:trend?.id||null,draftCount:drafts.length,quality:insights.map((x:any)=>x.analysis.quality.score),risk:insights.map((x:any)=>x.analysis.risk.risk)}}));\n  return NextResponse.json({drafts,insights,source:apiKey?"ai":"fallback",trend:trend?{id:trend.id,title:trend.title,score:trend.score}:null,learning});
  }catch(e){
   const message=e instanceof Error?e.message:"Generation failed";
   if(message==="UNAUTHENTICATED")return NextResponse.json({error:"Please sign in again."},{status:401});
