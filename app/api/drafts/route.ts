@@ -1,18 +1,7 @@
 import {NextResponse} from "next/server";
 import {listDrafts,saveDrafts,updateStatus} from "@/lib/store";
 import {buildDrafts} from "@/lib/agent";
-
-export async function GET(){return NextResponse.json({drafts:await listDrafts()});}
-export async function POST(req:Request){
- const b=await req.json().catch(()=>({}));
- if(!b.topic||typeof b.topic!=="string") return NextResponse.json({error:"Topic required"},{status:400});
- const drafts=buildDrafts(b.topic);
- return NextResponse.json({drafts:await saveDrafts(drafts)});
-}
-export async function PATCH(req:Request){
- const b=await req.json().catch(()=>({}));
- if(!b.id||!b.status) return NextResponse.json({error:"id and status required"},{status:400});
- const draft=await updateStatus(b.id,b.status,b.scheduledAt);
- if(!draft) return NextResponse.json({error:"Draft not found"},{status:404});
- return NextResponse.json({draft});
-}
+import {requireUser,runAsUser} from "@/lib/auth";
+export async function GET(){try{const u=await requireUser();return NextResponse.json(await runAsUser(u,async()=>({drafts:await listDrafts()})))}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}}
+export async function POST(req:Request){try{const u=await requireUser();const b=await req.json().catch(()=>({}));if(!b.topic||typeof b.topic!=="string")return NextResponse.json({error:"Topic required"},{status:400});return NextResponse.json(await runAsUser(u,async()=>({drafts:await saveDrafts(buildDrafts(b.topic))})))}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}}
+export async function PATCH(req:Request){try{const u=await requireUser();const b=await req.json().catch(()=>({}));if(!b.id||!b.status)return NextResponse.json({error:"id and status required"},{status:400});return NextResponse.json(await runAsUser(u,async()=>{const draft=await updateStatus(b.id,b.status,b.scheduledAt);return draft?{draft}:{error:"Draft not found"}}))}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}}
