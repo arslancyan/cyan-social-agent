@@ -1,4 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
+import {listAgentUsers,runAsUser} from "@/lib/auth";
 import {dueDrafts,getControl,heartbeat,latestTrends,recordWorker,reprioritizeSchedule,saveTrends,updateStatus} from "@/lib/store";
 import {publishDraft} from "@/lib/platforms";
 import {scoreTrend} from "@/lib/scoring";
@@ -36,46 +37,38 @@ async function pollTrends(){
 async function run(req:NextRequest){
  if(!authorized(req)) return NextResponse.json({error:"Unauthorized worker request"},{status:401});
  try{
-  const control=await getControl();
-  await heartbeat();
-  if(control.paused){
-   await recordWorker(true,"Agent paused; scheduler and trend tick skipped.");
-   return NextResponse.json({ok:true,paused:true,processed:0});
-  }
-
-  let trendResult={fetched:0,top:null as Trend|null,interrupted:0};
-  if(process.env.TREND_SOURCE_URL){
-   try{
-    const polled=await pollTrends();
-    trendResult.fetched=polled.fetched;
-    trendResult.top=polled.top;
-    if(polled.top&&control.mode!=="conservative"&&polled.top.score>=85){
-     const result=await reprioritizeSchedule(polled.top.id,polled.top.score);
-     trendResult.interrupted=result.changed.length;
+  const users=await listAgentUsers();
+  const summaries=[];
+  for(const user of users){
+   const result=await runAsUser(user,async()=>{
+    const control=await getControl();
+    await heartbeat();
+    if(control.paused){await recordWorker(true,"Agent paused; tick skipped.");return {paused:true,processed:0,blocked:0,trend:{fetched:0,top:null,interrupted:0}};}
+    let trendResult={fetched:0,top:null as Trend|null,interrupted:0};
+    if(process.env.TREND_SOURCE_URL){
+     try{
+      const polled=await pollTrends();trendResult.fetched=polled.fetched;trendResult.top=polled.top;
+      if(polled.top&&control.mode!=="conservative"&&polled.top.score>=85){
+       const changed=await reprioritizeSchedule(polled.top.id,polled.top.score);trendResult.interrupted=changed.changed.length;
+      }
+     }catch{}
     }
-   }catch(e){
-    trendResult.top=null;
-   }
+    const due=await dueDrafts();const results=[];
+    for(const draft of due){
+     const published=await publishDraft(draft);
+     if(published.ok) await updateStatus(draft.id,"published");
+     else await updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString());
+     results.push({id:draft.id,platform:draft.platform,ok:published.ok,message:published.message});
+    }
+    const processed=results.filter(r=>r.ok).length,blocked=results.filter(r=>!r.ok).length;
+    await recordWorker(blocked===0,"Trends="+trendResult.fetched+"; due="+due.length+"; published="+processed+"; blocked="+blocked+"; interrupted="+trendResult.interrupted);
+    return {paused:false,processed,blocked,trend:trendResult};
+   });
+   summaries.push({workspace:user.id,email:user.email,plan:user.plan,...result});
   }
-
-  const due=await dueDrafts();
-  const results=[];
-  for(const draft of due){
-   const result=await publishDraft(draft);
-   if(result.ok) await updateStatus(draft.id,"published");
-   else await updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString());
-   results.push({id:draft.id,platform:draft.platform,ok:result.ok,message:result.message});
-  }
-  const processed=results.filter(r=>r.ok).length;
-  const blocked=results.filter(r=>!r.ok).length;
-  await recordWorker(blocked===0,"Trends="+trendResult.fetched+"; due="+due.length+"; published="+processed+"; blocked="+blocked+"; interrupted="+trendResult.interrupted);
-  return NextResponse.json({ok:true,paused:false,processed,blocked,trend:trendResult,topTrends:(await latestTrends(5)),results,heartbeat:new Date().toISOString()});
+  return NextResponse.json({ok:true,workspaces:summaries.length,summaries,heartbeat:new Date().toISOString()});
  }catch(e){
   const message=e instanceof Error?e.message:"Worker tick failed";
-  try{await recordWorker(false,message)}catch{}
   return NextResponse.json({error:message},{status:500});
  }
 }
-
-export async function GET(req:NextRequest){return run(req);}
-export async function POST(req:NextRequest){return run(req);}
