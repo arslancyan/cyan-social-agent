@@ -1,7 +1,7 @@
 import {dbReady,pool} from "./db";
 import {workspaceId} from "./auth";
 import {Platform,Trend} from "./types";
-import {generationStrategy,platformPerformanceScores} from "./adaptive";
+import {generationStrategy,platformPerformanceScores,platformAdaptationPlans} from "./adaptive";
 import {latestTrends,contentFatigue} from "./store";
 import {explorationBudget} from "./experiment-engine";
 import {topPatterns} from "./pattern-memory";
@@ -12,7 +12,7 @@ const clamp=(n:number,a=0,b=100)=>Math.max(a,Math.min(b,n));
 
 export async function chooseNextIdea():Promise<StrategyDecision|null>{
  await dbReady();
- const [trends,platforms,strategy,budget,patterns]=await Promise.all([latestTrends(30),platformPerformanceScores(),generationStrategy(),explorationBudget(),topPatterns(80)]);
+ const [trends,platforms,strategy,budget,patterns,adaptations]=await Promise.all([latestTrends(30),platformPerformanceScores(),generationStrategy(),explorationBudget(),topPatterns(80),platformAdaptationPlans()]);
  if(!trends.length)return null;
  const recent=await pool.query("SELECT id,content,platform,angle,created_at FROM cyan_drafts WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '7 days' ORDER BY created_at DESC LIMIT 150",[workspaceId()]);
  const recentRows=recent.rows;
@@ -31,7 +31,9 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
     ? platforms.filter(x=>strategy.explorePlatforms.includes(x.platform)).sort((a,b)=>b.confidence-a.confidence)[0]?.platform
     : target?.platform||[...platforms].sort((a,b)=>(b.score*b.confidence)-(a.score*a.confidence))[0]?.platform
   )||"X") as Platform;
-  const evidencePenalty=evidenceRich.has(platform)?0:Math.min(12,Math.max(0,55-(platforms.find(x=>x.platform===platform)?.confidence||0))*0.2);
+  const adaptation=adaptations.find(x=>x.platform===platform);
+  const adaptationPenalty=adaptation&&adaptation.confidence<40?8:0;
+  const evidencePenalty=evidenceRich.has(platform)?0:Math.min(12,Math.max(0,55-(platforms.find(x=>x.platform===platform)?.confidence||0))*0.2)+adaptationPenalty;
   const angle=explore?"Contrarian":(target?.platform===platform?target.angle:strategy.bestAngle||"Hook");
   const pattern=patterns.find(p=>p.patternType==="platform_angle"&&p.patternKey===platform+"|"+angle);
   const memoryScore=pattern?Math.round(50+(pattern.score-50)*Math.exp(-Math.max(0,(Date.now()-new Date(pattern.lastObservedAt).getTime())/86400000)/45)):50;
@@ -43,12 +45,12 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
   const decision:StrategyDecision["decision"]=explore?"explore":memoryScore>=72&&confidence>=60?"exploit":memoryScore<42&&pattern?"refresh":"avoid";
   const priority=Math.round(clamp(trendScore-(decision==="avoid"?12:0)-evidencePenalty));
   const reason=decision==="explore"?"Explore a lower-confidence platform/angle while the exploration budget permits it.":decision==="refresh"?"Refresh a decaying pattern with a new execution instead of repeating the old creative.":decision==="avoid"?"Avoid a weak or overused pattern and preserve room for a better combination.":"Exploit a proven pattern, weighted by its decayed memory score and current trend strength.";
-  return{trend:t,priority,reason:reason+" "+(evidencePenalty>0?"Platform evidence is still limited, so CYAN keeps confidence conservative.":""),platform,angle,features:strategy.topFeatures.slice(0,3),topic:t.title,exploration:explore,recommendedAt:new Date(Date.now()+30*60000).toISOString(),confidence,memoryScore,novelty,decision};
+  return{trend:t,priority,reason:reason+" "+(evidencePenalty>0?"Platform/adaptation evidence is still limited, so CYAN keeps confidence conservative.":""),platform,angle,features:strategy.topFeatures.slice(0,3),topic:t.title,exploration:explore,recommendedAt:new Date(Date.now()+30*60000).toISOString(),confidence,memoryScore,novelty,decision};
  }).filter(x=>x.decision!=="avoid"||x.priority>=70).sort((a,b)=>b.priority-a.priority);
  const chosen=candidates[0]||null;
  if(chosen){
   const recent=await pool.query("SELECT 1 FROM cyan_strategy_decisions WHERE workspace_id=$1 AND trend_id=$2 AND platform=$3 AND angle=$4 AND created_at>=NOW()-INTERVAL '30 minutes' LIMIT 1",[workspaceId(),chosen.trend.id,chosen.platform,chosen.angle]);
-  if(!recent.rowCount)await pool.query("INSERT INTO cyan_strategy_decisions(workspace_id,trend_id,platform,angle,decision,exploration,priority,confidence,reason,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[workspaceId(),chosen.trend.id,chosen.platform,chosen.angle,chosen.decision,chosen.exploration,chosen.priority,chosen.confidence,chosen.reason,JSON.stringify({memoryScore:chosen.memoryScore,novelty:chosen.novelty})]);
+  if(!recent.rowCount)await pool.query("INSERT INTO cyan_strategy_decisions(workspace_id,trend_id,platform,angle,decision,exploration,priority,confidence,reason,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[workspaceId(),chosen.trend.id,chosen.platform,chosen.angle,chosen.decision,chosen.exploration,chosen.priority,chosen.confidence,chosen.reason,JSON.stringify({memoryScore:chosen.memoryScore,novelty:chosen.novelty,adaptationConfidence:adaptations.find(x=>x.platform===chosen.platform)?.confidence||0})]);
  }
  return chosen;
 }
