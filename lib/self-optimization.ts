@@ -3,6 +3,7 @@ import {workspaceId} from "./auth";
 import {Platform} from "./types";
 import {platformPerformanceScores,anglePerformanceScores,featurePerformanceScores,timeSlotScores,platformAdaptationPlans} from "./adaptive";
 import {topPatterns} from "./pattern-memory";
+import {learnedWeights} from "./online-learning";
 
 const clamp=(n:number,a=0,b=100)=>Math.max(a,Math.min(b,n));
 const num=(v:any)=>Number.isFinite(Number(v))?Number(v):0;
@@ -28,7 +29,8 @@ export async function expectedOutcomeScore(input:{
   const time=input.timeScore*.65+input.timeConfidence*.35;
   const adaptation=input.adaptationScore*.6+input.adaptationConfidence*.4;
   const memory=clamp(num(input.memoryScore)||50);
-  let score=trend*.25+platform*.18+angle*.14+feature*.12+time*.11+adaptation*.10+memory*.10;
+  const weights=await learnedWeights();
+  let score=trend*weights.trend+platform*weights.platform+angle*weights.angle+feature*weights.feature+time*weights.time+adaptation*weights.adaptation+memory*weights.memory;
   if(input.exploration)score+=Math.max(0,35-Math.min(35,input.platformConfidence*.25));
   const confidence=clamp(input.platformConfidence*.25+input.angleConfidence*.18+input.featureConfidence*.15+input.timeConfidence*.15+input.adaptationConfidence*.17+(input.memoryScore?10:0));
   return {score:Math.round(clamp(score)),confidence:Math.round(confidence)};
