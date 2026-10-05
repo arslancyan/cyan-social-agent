@@ -3,7 +3,7 @@ import {workspaceId} from "./auth";
 import {Platform} from "./types";
 import {platformPerformanceScores,anglePerformanceScores,featurePerformanceScores,timeSlotScores,platformAdaptationPlans} from "./adaptive";
 import {topPatterns} from "./pattern-memory";
-import {learnedWeights} from "./online-learning";
+import {learnedWeights,LearnedWeights} from "./online-learning";
 
 const clamp=(n:number,a=0,b=100)=>Math.max(a,Math.min(b,n));
 const num=(v:any)=>Number.isFinite(Number(v))?Number(v):0;
@@ -20,7 +20,7 @@ export async function expectedOutcomeScore(input:{
   featureScore:number; featureConfidence:number;
   timeScore:number; timeConfidence:number;
   adaptationScore:number; adaptationConfidence:number;
-  memoryScore?:number; exploration?:boolean;
+  memoryScore?:number; exploration?:boolean; weights?:LearnedWeights;
 }){
   const trend=clamp(input.trendScore*.65+num(input.velocity)*.2+num(input.relevance)*.15);
   const platform=input.platformScore*.7+input.platformConfidence*.3;
@@ -29,7 +29,7 @@ export async function expectedOutcomeScore(input:{
   const time=input.timeScore*.65+input.timeConfidence*.35;
   const adaptation=input.adaptationScore*.6+input.adaptationConfidence*.4;
   const memory=clamp(num(input.memoryScore)||50);
-  const weights=await learnedWeights();
+  const weights=input.weights||await learnedWeights();
   let score=trend*weights.trend+platform*weights.platform+angle*weights.angle+feature*weights.feature+time*weights.time+adaptation*weights.adaptation+memory*weights.memory;
   if(input.exploration)score+=Math.max(0,35-Math.min(35,input.platformConfidence*.25));
   const confidence=clamp(input.platformConfidence*.25+input.angleConfidence*.18+input.featureConfidence*.15+input.timeConfidence*.15+input.adaptationConfidence*.17+(input.memoryScore?10:0));
@@ -37,7 +37,7 @@ export async function expectedOutcomeScore(input:{
 }
 
 export async function rankDecisionCandidates(trend:any, limit=12):Promise<OptimizationCandidate[]>{
-  const [platforms,adaptations,patterns]=await Promise.all([platformPerformanceScores(),platformAdaptationPlans(),topPatterns(120)]);
+  const [platforms,adaptations,patterns,weights]=await Promise.all([platformPerformanceScores(),platformAdaptationPlans(),topPatterns(120),learnedWeights()]);
   const out:OptimizationCandidate[]=[];
   for(const p of platforms){
     const [angles,features,slots]=await Promise.all([anglePerformanceScores(p.platform),featurePerformanceScores(p.platform),timeSlotScores(p.platform)]);
@@ -54,7 +54,7 @@ export async function rankDecisionCandidates(trend:any, limit=12):Promise<Optimi
         featureScore:num(f.score),featureConfidence:num(f.confidence),
         timeScore:num(slot.score),timeConfidence:num(slot.confidence),
         adaptationScore:num(adaptation?.score)||50,adaptationConfidence:num(adaptation?.confidence),
-        memoryScore:num(memory?.score)||50,exploration:p.confidence<55
+        memoryScore:num(memory?.score)||50,exploration:p.confidence<55,weights
       });
       out.push({platform:p.platform,angle:a.angle,feature:f.feature+":"+f.value,hour:slot.hour,day:slot.day,expectedScore:result.score,confidence:result.confidence,novelty:clamp(100-(memory?.samples||0)*8),evidence:[
         p.samples?p.samples+" official platform snapshots":"no platform snapshot evidence",
