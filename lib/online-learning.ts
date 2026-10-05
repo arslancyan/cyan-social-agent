@@ -27,7 +27,8 @@ export async function learnedWeights():Promise<LearnedWeights>{
 export async function recordWeightSnapshot(){
  const weights=await learnedWeights();
  await dbReady();
- await pool.query("INSERT INTO cyan_events(workspace_id,type,metadata) VALUES($1,'weight_update',$2)",[workspaceId(),JSON.stringify({source:"official_api",weights,updatedAt:new Date().toISOString()})]);
+ const recent=await pool.query("SELECT 1 FROM cyan_events WHERE workspace_id=$1 AND type=$2 AND created_at>=NOW()-INTERVAL '6 hours' LIMIT 1",[workspaceId(),"weight_update"]);
+ if(!recent.rowCount)await pool.query("INSERT INTO cyan_events(workspace_id,type,metadata) VALUES($1,'weight_update',$2)",[workspaceId(),JSON.stringify({source:"official_api",weights,updatedAt:new Date().toISOString()})]);
  return weights;
 }
 
