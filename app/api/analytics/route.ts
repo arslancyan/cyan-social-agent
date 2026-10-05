@@ -6,6 +6,7 @@ import {contentIntelligenceSummary} from "@/lib/store";
 import {featurePerformanceScores} from "@/lib/adaptive";
 import {growthStatus} from "@/lib/growth-optimizer";
 import {explorationBudget} from "@/lib/experiment-engine";
+import {patternHealth,topPatterns} from "@/lib/pattern-memory";
 export const dynamic="force-dynamic";
 export async function POST(req:Request){
  try{
@@ -33,14 +34,14 @@ export async function GET(){
     analyticsSummary(),
     pool.query("SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE score>=85)::int AS high, COALESCE(ROUND(AVG(score)),0)::int AS avg FROM cyan_trends WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days'",[user.id]),
     pool.query("SELECT COALESCE(SUM(generations),0)::int AS generations,COALESCE(SUM(publishes),0)::int AS publishes FROM cyan_usage WHERE user_id=$1 AND day>=CURRENT_DATE-INTERVAL '29 days'",[user.id]),
-    contentIntelligenceSummary(),featurePerformanceScores(),growthStatus(),explorationBudget()
+    contentIntelligenceSummary(),featurePerformanceScores(),growthStatus(),explorationBudget(),patternHealth(),topPatterns(15)
    ]);
    const published=events.filter((x:any)=>x.type==="publish").reduce((n:number,x:any)=>n+Number(x.count||0),0);
    const [platforms,feedback]=await Promise.all([
     pool.query("SELECT COALESCE(platform,'unknown') AS platform,type,COUNT(*)::int AS count FROM cyan_events WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days' GROUP BY platform,type ORDER BY count DESC",[user.id]),
     pool.query("SELECT COUNT(*) FILTER (WHERE type='generation')::int AS generations,COUNT(*) FILTER (WHERE type='publish')::int AS publishes,COUNT(*) FILTER (WHERE type='publish_failed')::int AS failed,COUNT(*) FILTER (WHERE type='publish_blocked')::int AS blocked FROM cyan_events WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days'",[user.id])
    ]);
-   return {published,events,platforms:platforms.rows,feedback:feedback.rows[0]||{generations:0,publishes:0,failed:0,blocked:0},trend:{total:Number(trendStats.rows[0]?.total||0),high:Number(trendStats.rows[0]?.high||0),average:Number(trendStats.rows[0]?.avg||0)},usage:{generations:Number(usage.rows[0]?.generations||0),publishes:Number(usage.rows[0]?.publishes||0)},contentIntelligence:content,featureScores:features.slice(0,20),growth,explorationBudget:budget};
+   return {published,events,platforms:platforms.rows,feedback:feedback.rows[0]||{generations:0,publishes:0,failed:0,blocked:0},trend:{total:Number(trendStats.rows[0]?.total||0),high:Number(trendStats.rows[0]?.high||0),average:Number(trendStats.rows[0]?.avg||0)},usage:{generations:Number(usage.rows[0]?.generations||0),publishes:Number(usage.rows[0]?.publishes||0)},contentIntelligence:content,featureScores:features.slice(0,20),growth,explorationBudget:budget,creativeMemory:memory,topPatterns:patterns};
   }));
  }catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Analytics API failed",e);return NextResponse.json({error:"Analytics unavailable"},{status:503});}
 }
