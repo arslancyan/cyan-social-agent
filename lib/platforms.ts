@@ -4,16 +4,24 @@ import {getConnectionSecret,updateConnectionTokens} from "./store";
 
 export interface PublishResult { platform:Platform; ok:boolean; message:string; externalId?:string; pending?:boolean; }
 
+async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeoutMs=15000){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{
+  return await fetch(input,{...init,signal:controller.signal});
+ }finally{clearTimeout(timer);}
+}
+
 async function refreshX(refreshToken:string){
  const clientId=process.env.X_CLIENT_ID;
  if(!clientId)throw new Error("X_CLIENT_ID is not configured");
  const body=new URLSearchParams({refresh_token:refreshToken,grant_type:"refresh_token",client_id:clientId});
- const response=await fetch("https://api.x.com/2/oauth2/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
+ const response=await fetchWithTimeout("https://api.x.com/2/oauth2/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
  if(!response.ok)throw new Error("X token refresh failed");
  return response.json();
 }
 async function postX(token:string,text:string){
- return fetch("https://api.x.com/2/tweets",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},body:JSON.stringify({text})});
+ return fetchWithTimeout("https://api.x.com/2/tweets",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},body:JSON.stringify({text})});
 }
 async function publishX(draft:Draft):Promise<PublishResult>{
  const connection=await getConnectionSecret("X");
@@ -40,7 +48,7 @@ async function publishTikTok(draft:Draft):Promise<PublishResult>{
  try{
   const token=await decryptSecret(connection.access_token_enc);
   if(draft.externalId){
-   const statusResponse=await fetch("https://open.tiktokapis.com/v2/post/publish/status/fetch/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({publish_id:draft.externalId})});
+   const statusResponse=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/status/fetch/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({publish_id:draft.externalId})});
    const statusData=await statusResponse.json().catch(()=>({}));
    if(statusResponse.ok&&statusData?.error?.code==="ok"){
     const status=String(statusData?.data?.status||"");
@@ -49,13 +57,13 @@ async function publishTikTok(draft:Draft):Promise<PublishResult>{
    }
    return{platform:"TikTok",ok:false,pending:true,message:"TikTok is still processing the publish request.",externalId:draft.externalId};
   }
-  const creator=await fetch("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"});
+  const creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"});
   const creatorData=await creator.json().catch(()=>({}));
   if(!creator.ok||creatorData?.error?.code!=="ok")return{platform:"TikTok",ok:false,message:creatorData?.error?.message||"TikTok creator information could not be queried."};
   const options=creatorData.data?.privacy_level_options||[];
   const privacy=process.env.TIKTOK_DEFAULT_PRIVACY_LEVEL&&options.includes(process.env.TIKTOK_DEFAULT_PRIVACY_LEVEL)?process.env.TIKTOK_DEFAULT_PRIVACY_LEVEL:options.includes("PUBLIC_TO_EVERYONE")?"PUBLIC_TO_EVERYONE":options[0];
   if(!privacy)return{platform:"TikTok",ok:false,message:"TikTok returned no usable privacy level."};
-  const init=await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({post_info:{title:draft.content.slice(0,2200),privacy_level:privacy,is_aigc:Boolean(process.env.TIKTOK_MARK_AI_GENERATED==="true")},source_info:{source:"PULL_FROM_URL",video_url:draft.mediaUrl}})});
+  const init=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/video/init/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({post_info:{title:draft.content.slice(0,2200),privacy_level:privacy,is_aigc:Boolean(process.env.TIKTOK_MARK_AI_GENERATED==="true")},source_info:{source:"PULL_FROM_URL",video_url:draft.mediaUrl}})});
   const data=await init.json().catch(()=>({}));
   if(!init.ok||data?.error?.code!=="ok")return{platform:"TikTok",ok:false,message:data?.error?.message||"TikTok rejected the video publish request."};
   const publishId=data?.data?.publish_id;
