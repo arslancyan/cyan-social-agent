@@ -68,12 +68,13 @@ export async function rankDecisionCandidates(trend:any, limit=12):Promise<Optimi
 
 export async function calibrateLearning():Promise<{updates:number;averageError:number;bias:number}>{
   await dbReady();
-  const r=await pool.query(`SELECT d.id,d.platform,d.angle,d.features,e.metadata,e.created_at
+  const r=await pool.query(`SELECT DISTINCT ON (e.draft_id,e.metadata->>'window') d.id,d.platform,d.angle,d.features,e.metadata,e.created_at
     FROM cyan_events e JOIN cyan_drafts d ON d.id=e.draft_id AND d.workspace_id=e.workspace_id
     WHERE e.workspace_id=$1 AND e.type='performance_snapshot'
       AND e.created_at>=NOW()-INTERVAL '14 days'
       AND e.metadata->>'window' IN ('24h','72h')
-    ORDER BY e.created_at DESC LIMIT 500`,[workspaceId()]);
+    ORDER BY e.draft_id,e.metadata->>'window',e.created_at DESC
+    LIMIT 500`,[workspaceId()]);
   if(!r.rows.length)return {updates:0,averageError:0,bias:0};
   let total=0,bias=0,count=0;
   for(const row of r.rows){
@@ -81,12 +82,13 @@ export async function calibrateLearning():Promise<{updates:number;averageError:n
     const impressions=Math.max(1,num(m.impressions||m.views));
     const interactions=num(m.likes)+num(m.comments)*3+num(m.shares)*4+num(m.clicks)*2;
     const actual=clamp(interactions/impressions*1000);
-    const expected=clamp(50+Math.min(35,Math.log10(impressions+1)*8));
+    const expected=Number.isFinite(Number(m.expectedOutcome))?clamp(Number(m.expectedOutcome)):clamp(50+Math.min(35,Math.log10(impressions+1)*8));
     const error=actual-expected;
     total+=Math.abs(error);bias+=error;count++;
   }
   const averageError=Number((total/count).toFixed(2)),meanBias=Number((bias/count).toFixed(2));
-  await pool.query(`INSERT INTO cyan_events(workspace_id,type,metadata) VALUES($1,'learning_update',$2)`,[workspaceId(),JSON.stringify({source:"official_api",schemaVersion:1,windows:["24h","72h"],samples:count,averageAbsoluteError:averageError,bias:meanBias,updatedAt:new Date().toISOString()})]);
+  const recent=await pool.query("SELECT 1 FROM cyan_events WHERE workspace_id=$1 AND type='learning_update' AND created_at>=NOW()-INTERVAL '6 hours' LIMIT 1",[workspaceId()]);
+  if(!recent.rowCount)await pool.query(`INSERT INTO cyan_events(workspace_id,type,metadata) VALUES($1,'learning_update',$2)`,[workspaceId(),JSON.stringify({source:"official_api",schemaVersion:2,windows:["24h","72h"],samples:count,averageAbsoluteError:averageError,bias:meanBias,predictionSource:"event_metadata_or_baseline",updatedAt:new Date().toISOString()})]);
   return {updates:count,averageError,bias:meanBias};
 }
 
@@ -97,7 +99,7 @@ export async function combinationMemory(){
     WHERE e.workspace_id=$1 AND e.type='performance_snapshot' AND e.created_at>=NOW()-INTERVAL '90 days' LIMIT 4000`,[workspaceId()]);
   const groups=new Map<string,any[]>();
   for(const row of r.rows){const f=row.features||{};const key=String(row.platform)+"|"+String(row.angle)+"|"+String(f.format||"unknown");if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(row);}
-  return [...groups.entries()].map(([key,rows])=>{let weighted=0,weight=0;for(const row of rows){const m=row.metadata||{};const impressions=Math.max(1,num(m.impressions||m.views));const interactions=num(m.likes)+num(m.comments)*3+num(m.shares)*4+num(m.clicks)*2;const score=clamp(interactions/impressions*1000);const age=Math.max(0,(Date.now()-new Date(row.created_at).getTime())/86400000);const w=Math.max(.2,Math.exp(-age/45));weighted+=score*w;weight+=w;}const [platform,angle,format]=key.split("|");return{platform,angle,format,score:Math.round(weight?weighted/weight:50),samples:rows.length,confidence:Math.round(Math.min(100,rows.length*7))};}).sort((a,b)=>b.score-b.score);
+  return [...groups.entries()].map(([key,rows])=>{let weighted=0,weight=0;for(const row of rows){const m=row.metadata||{};const impressions=Math.max(1,num(m.impressions||m.views));const interactions=num(m.likes)+num(m.comments)*3+num(m.shares)*4+num(m.clicks)*2;const score=clamp(interactions/impressions*1000);const age=Math.max(0,(Date.now()-new Date(row.created_at).getTime())/86400000);const w=Math.max(.2,Math.exp(-age/45));weighted+=score*w;weight+=w;}const [platform,angle,format]=key.split("|");const effective=rows.reduce((s,row)=>s+Math.max(.25,Math.exp(-Math.max(0,(Date.now()-new Date(row.created_at).getTime())/86400000)/45)),0);const confidence=Math.round(100*(1-Math.exp(-effective/12)));return{platform,angle,format,score:Math.round(weight?weighted/weight:50),samples:rows.length,confidence};}).sort((a,b)=>b.score-a.score);
 }
 
 export async function optimizationStatus(){
