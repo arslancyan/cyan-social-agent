@@ -24,7 +24,7 @@ export async function claimDueDrafts(now=new Date()){await dbReady();const clien
 export async function recoverStalePublishing(now=new Date()){
  await dbReady();
  const cutoff=new Date(now.getTime()-15*60*1000).toISOString();
- const r=await pool.query(`UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1
+ const r=await pool.query(`UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1,publish_started_at=NULL
   WHERE workspace_id=$2 AND status='publishing' AND scheduled_at IS NOT NULL AND scheduled_at <= $3
   RETURNING id`,[now.toISOString(),workspaceId(),cutoff]);
  return r.rowCount||0;
