@@ -1,0 +1,11 @@
+"use client";
+import {useState} from "react";
+type Draft={platform:string;content:string;angle:string};
+export default function Home(){
+ const [topic,setTopic]=useState("Crypto market story with a useful angle"),[loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]),[error,setError]=useState("");
+ async function generate(){setLoading(true);setError("");try{const r=await fetch("/api/generate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({topic})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Generation failed");setDrafts(d.drafts)}catch(e){setError(e instanceof Error?e.message:"Generation failed")}finally{setLoading(false)}}
+ return <main className="page"><header className="top"><div className="brand"><div className="mark">C</div><div><strong>CYAN</strong><div className="muted">Social Agent</div></div></div><span className="pill">MVP · human approval</span></header>
+ <section className="grid"><div className="card"><div className="title">Trend intelligence</div><div className="hero">Turn a story into platform-native content.</div><p className="muted">Discover → Verify → Score → Generate → Adapt → Review → Schedule → Publish → Analyze.</p><div className="title">Topic / source summary</div><textarea value={topic} onChange={e=>setTopic(e.target.value)} rows={6} style={{width:"100%",marginTop:8,background:"#06101d",color:"#eaf2ff",border:"1px solid #19304d",borderRadius:12,padding:14}}/><button className="btn" style={{marginTop:12}} onClick={generate} disabled={loading}>{loading?"Generating…":"Generate content"}</button>{error&&<div>{error}</div>}</div>
+ <div className="card"><div className="title">Agent status</div>{[["Research","READY"],["Content engine","READY"],["Social connectors","PENDING AUTH"],["Scheduler","SAFE MODE"]].map(x=><div className="row" key={x[0]}><span>{x[0]}</span><span className="pill">{x[1]}</span></div>)}</div></section>
+ <section className="card" style={{marginTop:18}}><div className="title">Generated queue</div><div className="queue" style={{marginTop:10}}>{drafts.length===0?<div className="muted">No drafts yet.</div>:drafts.map((d,i)=><div className="queueitem" key={i}><div><strong>{d.platform}</strong><div style={{marginTop:6}}>{d.content}</div></div><span className="pill">{d.angle}</span></div>)}</div></section></main>;
+}
