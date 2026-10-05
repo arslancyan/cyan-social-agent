@@ -28,7 +28,7 @@ export async function GET(req:NextRequest){
   let label:string|undefined;
   const me=await fetchWithTimeout("https://api.x.com/2/users/me",{headers:{authorization:"Bearer "+token.access_token}});
   if(me.ok){const d=await me.json();label=d.data?.username?("@"+d.data.username):d.data?.name;}
-  await runAsUser(user,()=>saveConnection("X",await encryptSecret(token.access_token),token.refresh_token?await encryptSecret(token.refresh_token):"",label));
+  const accessToken=await encryptSecret(token.access_token); const refreshToken=token.refresh_token?await encryptSecret(token.refresh_token):""; await runAsUser(user,()=>saveConnection("X",accessToken,refreshToken,label));
   c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");
   return NextResponse.redirect(new URL("/?connected=X",req.url));
  }catch(e){
