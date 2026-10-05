@@ -1,4 +1,5 @@
 import {NextResponse} from "next/server";
+import {dbReady,pool} from "@/lib/db";
 import {getControl} from "@/lib/store";
 
 export const dynamic="force-dynamic";
@@ -6,12 +7,20 @@ export const dynamic="force-dynamic";
 export async function GET(){
  let db=false;
  let control={mode:"smart",paused:false,heartbeatAt:null as string|null};
+ let dbError:string|undefined;
  if(process.env.DATABASE_URL){
-  try{control=await getControl();db=true}catch{}
+  try{
+   await dbReady();
+   await pool.query("SELECT 1");
+   control=await getControl();
+   db=true;
+  }catch(e){
+   dbError=e instanceof Error?e.message:"Database check failed";
+  }
  }
  return NextResponse.json({
   name:"CYAN Social Agent",
-  status:"ok",
+  status:db?"ok":"degraded",
   mode:control.mode,
   paused:control.paused,
   publishing:"official-api-only",
@@ -19,6 +28,7 @@ export async function GET(){
   scheduler:db,
   trendWatch:db&&Boolean(process.env.TREND_SOURCE_URL),
   lastHeartbeat:control.heartbeatAt||"not configured",
-  infrastructure:db?"database connected":"database not configured/unreachable"
- });
+  infrastructure:db?"database connected":"database not configured/unreachable",
+  ...(dbError?{databaseError:dbError}: {})
+ },{status:db?200:503});
 }
