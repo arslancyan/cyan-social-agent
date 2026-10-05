@@ -1,5 +1,6 @@
 import {dbReady,pool} from "./db";
 import {workspaceId} from "./auth";
+import {getControl} from "./store";
 import {Draft,Platform} from "./types";
 
 type PlatformScore={platform:Platform;score:number;confidence:number;samples:number;published:number;successRate:number;engagementRate:number;avgViews:number;reason:string};
@@ -28,13 +29,13 @@ export async function anglePerformanceScores(platform?:Platform):Promise<AngleSc
 }
 export async function timeSlotScores(platform:Platform){
  await dbReady();const r=await pool.query("SELECT type,metadata,created_at FROM cyan_events WHERE workspace_id=$1 AND platform=$2 AND created_at>=NOW()-INTERVAL '90 days' ORDER BY created_at DESC LIMIT 2000",[workspaceId(),platform]);
- const map=new Map<string,any[]>();for(const row of r.rows){const d=new Date(row.created_at),key=String(d.getUTCDay())+"-"+String(d.getUTCHours());if(!map.has(key))map.set(key,[]);map.get(key)!.push(row);}
+ const map=new Map<string,any[]>();for(const row of r.rows){const d=new Date(row.created_at),parts=new Intl.DateTimeFormat("en-US",{timeZone:(await getControl()).timezone,weekday:"short",hour:"2-digit",hour12:false}).formatToParts(d),wd=parts.find(x=>x.type==="weekday")?.value||"Sun",hour=Number(parts.find(x=>x.type==="hour")?.value||0),days:any={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6},key=String(days[wd])+"-"+String(hour);if(!map.has(key))map.set(key,[]);map.get(key)!.push(row);}
  const out:SlotScore[]=[];for(let day=0;day<7;day++)for(let hour=0;hour<24;hour++){const rows=map.get(String(day)+"-"+String(hour))||[],s=weightedScore(rows),score=Math.round(rows.length?55*.35+s.score*.65:55);out.push({platform,hour,day,score,confidence:Math.round(s.confidence),samples:s.samples,reason:rows.length?"Learned from historical performance in this time slot.":"Exploration slot; no historical evidence yet."});}return out.sort((a,b)=>b.score-a.score);
 }
-function nextOccurrence(day:number,hour:number,from:Date){const d=new Date(from);d.setUTCMinutes(0,0,0);let delta=(day-d.getUTCDay()+7)%7;if(delta===0&&hour<=d.getUTCHours())delta=7;d.setUTCDate(d.getUTCDate()+delta);d.setUTCHours(hour);return d;}
+function nextOccurrence(day:number,hour:number,from:Date,timezone:string){const days:any={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};for(let i=0;i<24*15;i++){const d=new Date(from.getTime()+i*3600000),parts=new Intl.DateTimeFormat("en-US",{timeZone:timezone,weekday:"short",hour:"2-digit",hour12:false}).formatToParts(d),wd=parts.find(x=>x.type==="weekday")?.value||"Sun",h=Number(parts.find(x=>x.type==="hour")?.value||0);if(days[wd]===day&&h===hour&&d.getTime()>from.getTime()+30*60000)return d;}return new Date(from.getTime()+24*3600000);}
 export async function adaptivePlan(drafts:Draft[],now=new Date()){
- const platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),angleBy=new Map(angles.map(x=>[x.angle,x]));
- const candidates=await Promise.all(drafts.map(async d=>{const p=platforms.find(x=>x.platform===d.platform)!;const best=(await timeSlotScores(d.platform))[0],a=angleBy.get(d.angle),angleScore=a?.score??55,score=Math.round(p.score*.45+angleScore*.25+best.score*.30),confidence=Math.round((p.confidence+(a?.confidence||0)+best.confidence)/3);return{draftId:d.id,platform:d.platform,angle:d.angle,score,confidence,recommendedAt:nextOccurrence(best.day,best.hour,now).toISOString(),platformScore:p.score,angleScore,timeScore:best.score,reason:[p.reason,a?.reason||"No angle history; exploration recommended.",best.reason].join(" ")};}));
+ const control=await getControl(),platforms=await platformPerformanceScores(),angles=await anglePerformanceScores(),angleBy=new Map(angles.map(x=>[x.angle,x]));
+ const candidates=await Promise.all(drafts.map(async d=>{const p=platforms.find(x=>x.platform===d.platform)!;const best=(await timeSlotScores(d.platform))[0],a=angleBy.get(d.angle),angleScore=a?.score??55,score=Math.round(p.score*.45+angleScore*.25+best.score*.30),confidence=Math.round((p.confidence+(a?.confidence||0)+best.confidence)/3);return{draftId:d.id,platform:d.platform,angle:d.angle,score,confidence,recommendedAt:nextOccurrence(best.day,best.hour,now,control.timezone).toISOString(),platformScore:p.score,angleScore,timeScore:best.score,reason:[p.reason,a?.reason||"No angle history; exploration recommended.",best.reason].join(" ")};}));
  return candidates.sort((a,b)=>b.score-a.score);
 }
 export async function chooseBestDecision(drafts:Draft[],now=new Date()){const plans=await adaptivePlan(drafts,now);if(!plans.length)return null;return plans.find(x=>x.confidence>=25)||plans[0];}
