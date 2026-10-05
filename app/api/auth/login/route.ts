@@ -5,7 +5,7 @@ export async function POST(req:NextRequest){
  try{
   const b=await req.json();const email=String(b.email||"").trim().toLowerCase(),password=String(b.password||"");
   if(email.length>254||password.length>256)return NextResponse.json({error:"Invalid credentials"},{status:400});
-  const ip=req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()||"unknown";
+  const ip=req.headers.get("x-real-ip")?.trim()||req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()||"unknown";
   if(!(await rateLimit("login:"+ip+":"+email,8,600)))return NextResponse.json({error:"Too many login attempts. Try again later."},{status:429});
   await dbReady();const r=await pool.query("SELECT id,email,password_hash,plan FROM cyan_users WHERE email=$1",[email]);const u=r.rows[0];
   if(!u||!verifyPassword(password,u.password_hash))return NextResponse.json({error:"Invalid email or password"},{status:401});
