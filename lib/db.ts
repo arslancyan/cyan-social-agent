@@ -66,7 +66,7 @@ export async function dbReady(){
    CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(workspace_id,status,scheduled_at);
    CREATE TABLE IF NOT EXISTS cyan_control (
     workspace_id TEXT PRIMARY KEY, mode TEXT NOT NULL DEFAULT 'smart',
-    paused BOOLEAN NOT NULL DEFAULT FALSE, heartbeat_at TIMESTAMPTZ NULL,
+    paused BOOLEAN NOT NULL DEFAULT FALSE, timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta', heartbeat_at TIMESTAMPTZ NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
    CREATE TABLE IF NOT EXISTS cyan_worker_runs (
@@ -89,6 +89,7 @@ export async function dbReady(){
    );
    ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
    ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
+   ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta';
   `);
  })().catch(err=>{ globalThis.__cyanSchemaPromise=undefined; throw err; });
  return globalThis.__cyanSchemaPromise;
