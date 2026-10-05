@@ -16,7 +16,7 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
  if(!trends.length)return null;
  const recent=await pool.query("SELECT id,content,platform,angle,created_at FROM cyan_drafts WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '7 days' ORDER BY created_at DESC LIMIT 150",[workspaceId()]);
  const recentRows=recent.rows;
- const fatigue=await contentFatigue(recentRows.map((r:any)=>({id:r.id,platform:r.platform,angle:r.angle,content:r.content,status:"draft"} as any)));
+ await contentFatigue(recentRows.map((r:any)=>({id:r.id,platform:r.platform,angle:r.angle,content:r.content,status:"draft"} as any)));
  const recentAngles=new Map<string,number>();
  for(const r of recentRows)recentAngles.set(String(r.platform)+"|"+String(r.angle),(recentAngles.get(String(r.platform)+"|"+String(r.angle))||0)+1);
 
@@ -26,7 +26,12 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
   const explorationAllowed=!budget.needExploitation;
   const explore=Boolean((budget.needExploration&&index<3)||(explorationAllowed&&index===1&&strategy.explorePlatforms?.length));
   const target=cross.find((x:any)=>!explore||strategy.explorePlatforms.includes(x.platform))||cross[0];
-  const platform=((explore?platforms.find(x=>strategy.explorePlatforms.includes(x.platform))?.platform:target?.platform)||platforms[0]?.platform||"X") as Platform;
+  const evidenceRich=new Set(strategy.evidenceRichPlatforms||[]);
+  const platform=((explore
+    ? platforms.filter(x=>strategy.explorePlatforms.includes(x.platform)).sort((a,b)=>b.confidence-a.confidence)[0]?.platform
+    : target?.platform||[...platforms].sort((a,b)=>(b.score*b.confidence)-(a.score*a.confidence))[0]?.platform
+  )||"X") as Platform;
+  const evidencePenalty=evidenceRich.has(platform)?0:Math.min(12,Math.max(0,55-(platforms.find(x=>x.platform===platform)?.confidence||0))*0.2);
   const angle=explore?"Contrarian":(target?.platform===platform?target.angle:strategy.bestAngle||"Hook");
   const pattern=patterns.find(p=>p.patternType==="platform_angle"&&p.patternKey===platform+"|"+angle);
   const memoryScore=pattern?Math.round(50+(pattern.score-50)*Math.exp(-Math.max(0,(Date.now()-new Date(pattern.lastObservedAt).getTime())/86400000)/45)):50;
@@ -36,9 +41,9 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
   const trendScore=t.score*.55+(t.velocity||0)*.15+(t.relevance||0)*.1+novelty*.1+memoryScore*.1;
   const confidence=Math.round(clamp(((target?.confidence||0)+memoryScore+(100-Math.min(100,repeatCount*20)))/3));
   const decision:StrategyDecision["decision"]=explore?"explore":memoryScore>=72&&confidence>=60?"exploit":memoryScore<42&&pattern?"refresh":"avoid";
-  const priority=Math.round(clamp(trendScore-(decision==="avoid"?12:0)));
+  const priority=Math.round(clamp(trendScore-(decision==="avoid"?12:0)-evidencePenalty));
   const reason=decision==="explore"?"Explore a lower-confidence platform/angle while the exploration budget permits it.":decision==="refresh"?"Refresh a decaying pattern with a new execution instead of repeating the old creative.":decision==="avoid"?"Avoid a weak or overused pattern and preserve room for a better combination.":"Exploit a proven pattern, weighted by its decayed memory score and current trend strength.";
-  return{trend:t,priority,reason,platform,angle,features:strategy.topFeatures.slice(0,3),topic:t.title,exploration:explore,recommendedAt:new Date(Date.now()+30*60000).toISOString(),confidence,memoryScore,novelty,decision};
+  return{trend:t,priority,reason:reason+" "+(evidencePenalty>0?"Platform evidence is still limited, so CYAN keeps confidence conservative.":""),platform,angle,features:strategy.topFeatures.slice(0,3),topic:t.title,exploration:explore,recommendedAt:new Date(Date.now()+30*60000).toISOString(),confidence,memoryScore,novelty,decision};
  }).filter(x=>x.decision!=="avoid"||x.priority>=70).sort((a,b)=>b.priority-a.priority);
  const chosen=candidates[0]||null;
  if(chosen){
