@@ -20,10 +20,24 @@ function weightedScore(rows:any[]){
  return{score,confidence:clamp(samples/20*100),samples,successRate,engagementRate,avgViews};
 }
 export async function platformPerformanceScores():Promise<PlatformScore[]>{
- await dbReady();const r=await pool.query("SELECT platform,type,metadata,created_at FROM cyan_events WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '90 days' AND platform IS NOT NULL ORDER BY created_at DESC LIMIT 2000",[workspaceId()]);
- return PLATFORMS.map(platform=>{const rows=r.rows.filter((x:any)=>x.platform===platform),s=weightedScore(rows),prior=platform==="X"?62:platform==="TikTok"?60:platform==="Instagram"?58:52,score=s.samples<5?prior*.75+s.score*.25:prior*.25+s.score*.75;return{platform,score:Math.round(score),confidence:Math.round(s.confidence),samples:s.samples,published:rows.filter((x:any)=>x.type==="publish").length,successRate:Number(s.successRate.toFixed(3)),engagementRate:Number(s.engagementRate.toFixed(4)),avgViews:Math.round(s.avgViews),reason:s.samples<5?"Low-data prior; CYAN will learn as performance events arrive.":"Recent engagement, reach and publishing reliability are weighted with recency."};});
-}
-export async function anglePerformanceScores(platform?:Platform):Promise<AngleScore[]>{
+ await dbReady();
+ const r=await pool.query(`SELECT platform,type,metadata,created_at FROM cyan_events WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '90 days' AND platform IS NOT NULL AND type IN ('performance_snapshot','publish','publish_failed') ORDER BY created_at DESC LIMIT 3000`,[workspaceId()]);
+ return PLATFORMS.map(platform=>{
+  const rows=r.rows.filter((x:any)=>x.platform===platform);
+  const snapshots=rows.filter((x:any)=>x.type==="performance_snapshot");
+  const s=weightedScore(snapshots);
+  const published=rows.filter((x:any)=>x.type==="publish").length;
+  const failed=rows.filter((x:any)=>x.type==="publish_failed").length;
+  const reliability=(published+failed)?published/(published+failed):0.5;
+  const evidence=s.snapshots;
+  const prior=platform==="X"?62:platform==="TikTok"?60:platform==="Instagram"?58:52;
+  const evidenceWeight=Math.min(.8,evidence/12);
+  const score=prior*(1-evidenceWeight)+(s.score*.85+reliability*100*.15)*evidenceWeight;
+  const confidence=Math.round(Math.min(100,evidence*7+Math.min(20,published+failed)*1.5));
+  return{platform,score:Math.round(score),confidence,samples:evidence,published,successRate:Number(reliability.toFixed(3)),engagementRate:Number(s.engagementRate.toFixed(4)),avgViews:Math.round(s.avgViews),
+   reason:evidence===0?"No official performance evidence yet; prior is retained without pretending the platform has learned.":`${evidence} official performance snapshots with recency weighting; publishing reliability is used as a secondary signal.`};
+ });
+}export async function anglePerformanceScores(platform?:Platform):Promise<AngleScore[]>{
  await dbReady();const sql=`SELECT d.angle,e.metadata,e.created_at FROM cyan_events e JOIN cyan_drafts d ON d.id=e.draft_id AND d.workspace_id=e.workspace_id WHERE e.workspace_id=$1 AND e.type='performance_snapshot' AND e.created_at>=NOW()-INTERVAL '90 days' ${platform?"AND e.platform=$2":""} ORDER BY e.created_at DESC LIMIT 3000`;
  const r=await pool.query(sql,platform?[workspaceId(),platform]:[workspaceId()]);const groups=new Map<string,any[]>();
  for(const row of r.rows){const key=String(row.angle||"unknown");if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(row);}
