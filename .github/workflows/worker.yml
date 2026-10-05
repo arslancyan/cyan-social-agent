@@ -31,7 +31,7 @@ jobs:
             -H "Accept: application/json; api-version=2.0" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${CYAN_APP_URL%/}")"
           token="$(printf '%s' "$oidc_token" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
-          curl --fail --silent --show-error --max-time 50 \
+          curl --fail-with-body --silent --show-error --max-time 50 \
             -X POST "${CYAN_APP_URL%/}/api/worker/tick" \
             -H "x-github-oidc-token: ${token}" \
             -H "Accept: application/json"
