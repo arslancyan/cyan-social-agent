@@ -29,6 +29,12 @@ export async function dbReady(){
     day DATE NOT NULL, generations INTEGER NOT NULL DEFAULT 0, publishes INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(user_id,day)
    );
+   CREATE TABLE IF NOT EXISTS cyan_events (
+    id BIGSERIAL PRIMARY KEY, workspace_id TEXT NOT NULL, type TEXT NOT NULL,
+    platform TEXT NULL, draft_id TEXT NULL, external_id TEXT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   );
+   CREATE INDEX IF NOT EXISTS cyan_events_workspace_idx ON cyan_events(workspace_id,created_at DESC);
    CREATE TABLE IF NOT EXISTS cyan_subscriptions (
     user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL DEFAULT 'none', customer_id TEXT NULL, subscription_id TEXT NULL,
