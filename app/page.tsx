@@ -1,51 +1,69 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useEffect,useState} from "react";
 
-type Status = {agent:boolean; scheduler:boolean; trendWatch:boolean; lastHeartbeat:string};
-type Draft = {id:string; platform:string; content:string; angle:string; status:string; scheduledAt?:string; protected?:boolean};
+type Status={agent:boolean;scheduler:boolean;trendWatch:boolean;lastHeartbeat:string};
+type Draft={id:string;platform:string;content:string;angle:string;status:string;scheduledAt?:string;protected?:boolean};
 
 export default function Home(){
  const [status,setStatus]=useState<Status>({agent:false,scheduler:false,trendWatch:false,lastHeartbeat:"—"});
- const [mode,setMode]=useState("smart");
+ const [mode,setMode]=useState("smart"),[paused,setPaused]=useState(false),[savingControl,setSavingControl]=useState(false);
  const [topic,setTopic]=useState("Crypto market story with a useful angle");
  const [loading,setLoading]=useState(false),[drafts,setDrafts]=useState<Draft[]>([]);
  const [manual,setManual]=useState(""),[manualPlatform,setManualPlatform]=useState("X"),[scheduled,setScheduled]=useState(""),[protectedPost,setProtectedPost]=useState(false),[error,setError]=useState("");
 
  async function refresh(){
-  try{const r=await fetch("/api/health",{cache:"no-store"}); const d=await r.json(); if(r.ok)setStatus({agent:Boolean(d.agent),scheduler:Boolean(d.scheduler),trendWatch:Boolean(d.trendWatch),lastHeartbeat:d.lastHeartbeat||"—"});}catch{}
-  try{const r=await fetch("/api/drafts",{cache:"no-store"}); const d=await r.json(); if(r.ok)setDrafts(d.drafts||[]);}catch{}
+  try{
+   const r=await fetch("/api/health",{cache:"no-store"});const d=await r.json();
+   if(r.ok)setStatus({agent:Boolean(d.agent),scheduler:Boolean(d.scheduler),trendWatch:Boolean(d.trendWatch),lastHeartbeat:d.lastHeartbeat||"—"});
+  }catch{}
+  try{
+   const r=await fetch("/api/control",{cache:"no-store"});const d=await r.json();
+   if(r.ok){setMode(d.mode||"smart");setPaused(Boolean(d.paused))}
+  }catch{}
+  try{const r=await fetch("/api/drafts",{cache:"no-store"});const d=await r.json();if(r.ok)setDrafts(d.drafts||[])}catch{}
  }
- useEffect(()=>{refresh(); const id=setInterval(refresh,30000); return()=>clearInterval(id)},[]);
+ useEffect(()=>{refresh();const id=setInterval(refresh,30000);return()=>clearInterval(id)},[]);
 
+ async function updateControl(next:{mode?:string;paused?:boolean}){
+  setSavingControl(true);setError("");
+  try{
+   const r=await fetch("/api/control",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify(next)});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||"Control update failed");
+   setMode(d.mode||mode);setPaused(Boolean(d.paused));
+  }catch(e){setError(e instanceof Error?e.message:"Control update failed")}finally{setSavingControl(false)}
+ }
  async function generate(){
   setLoading(true);setError("");
-  try{const r=await fetch("/api/generate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({topic})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Generation failed");setDrafts(d.drafts||[]);}
+  try{const r=await fetch("/api/generate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({topic})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Generation failed");setDrafts(d.drafts||[])}
   catch(e){setError(e instanceof Error?e.message:"Generation failed")}finally{setLoading(false)}
  }
  async function saveManual(){
   setError("");
-  try{const r=await fetch("/api/manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({content:manual,platform:manualPlatform,scheduledAt:scheduled||undefined,protected:protectedPost})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save post");setManual("");setScheduled("");setProtectedPost(false);await refresh();}
-  catch(e){setError(e instanceof Error?e.message:"Could not save post")}
+  try{
+   const r=await fetch("/api/manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({content:manual,platform:manualPlatform,scheduledAt:scheduled||undefined,protected:protectedPost})});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save post");
+   setManual("");setScheduled("");setProtectedPost(false);await refresh();
+  }catch(e){setError(e instanceof Error?e.message:"Could not save post")}
  }
  return <main className="page">
   <header className="top">
    <div className="brand"><div className="mark">C</div><div><strong>CYAN</strong><div className="muted">Social Agent · Control Center</div></div></div>
-   <div className="top-actions"><span className="pill">REMOTE CONTROL</span><span className={"status "+(status.agent?"online":"offline")}><i/> {status.agent?"AGENT ONLINE":"AGENT OFFLINE"}</span></div>
+   <div className="top-actions"><span className="pill">REMOTE CONTROL</span><span className={"status "+(status.agent&&!paused?"online":"offline")}><i/> {paused?"AGENT PAUSED":status.agent?"AGENT ONLINE":"AGENT OFFLINE"}</span></div>
   </header>
 
   <section className="controlbar">
-   <div><div className="eyebrow">24/7 CLOUD CONTROL</div><div className="hero small">The dashboard is the remote control. Workers run independently in the cloud.</div></div>
-   <div className="mode"><span className="muted">Operation mode</span><select value={mode} onChange={e=>setMode(e.target.value)}><option value="conservative">Conservative</option><option value="smart">Smart</option><option value="autonomous">Autonomous</option></select></div>
+   <div><div className="eyebrow">24/7 CLOUD CONTROL</div><div className="hero small">The dashboard is the remote control. Workers run independently in the cloud.</div><button className={"btn "+(paused?"secondary":"")} onClick={()=>updateControl({paused:!paused})} disabled={savingControl}>{paused?"Resume agent":"Pause agent"}</button></div>
+   <div className="mode"><span className="muted">Operation mode</span><select value={mode} onChange={e=>updateControl({mode:e.target.value})} disabled={savingControl}><option value="conservative">Conservative</option><option value="smart">Smart</option><option value="autonomous">Autonomous</option></select></div>
   </section>
 
   <section className="statusgrid">
    {[
-    ["Agent",status.agent,"Cloud worker"],
-    ["Scheduler",status.scheduler,"Due-post runner"],
+    ["Agent",status.agent&&!paused,"Cloud worker"],
+    ["Scheduler",status.scheduler&&!paused,"Due-post runner"],
     ["Trend Watch",status.trendWatch,"Viral detector"],
     ["Heartbeat",true,status.lastHeartbeat]
-   ].map(([name,on,sub])=><div className="statcard" key={String(name)}><div className="stathead"><span>{name}</span><b className={on?"ok":"off"}>{on?"●":"○"}</b></div><strong>{name==="Heartbeat"?String(sub):on?"RUNNING":"NOT CONNECTED"}</strong><span className="muted">{name==="Heartbeat"?"Last worker signal":sub}</span></div>)}
+   ].map(([name,on,sub])=><div className="statcard" key={String(name)}><div className="stathead"><span>{name}</span><b className={on?"ok":"off"}>{on?"●":"○"}</b></div><strong>{name==="Heartbeat"?String(sub):on?"RUNNING":"NOT ACTIVE"}</strong><span className="muted">{name==="Heartbeat"?"Last worker signal":sub}</span></div>)}
   </section>
 
   <section className="grid">
