@@ -16,7 +16,7 @@ export async function GET(req:NextRequest){
   if(!code||!state||state!==expected||!verifier)c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400,headers:{"Cache-Control":"no-store"}});
   const key=process.env.TIKTOK_CLIENT_KEY,secret=process.env.TIKTOK_CLIENT_SECRET,redirect=process.env.TIKTOK_REDIRECT_URI;
   if(!key||!secret||!redirect)return NextResponse.json({error:"TikTok OAuth is not configured."},{status:503,headers:{"Cache-Control":"no-store"}});
-  const body=new URLSearchParams({client_key:key,client_secret:secret,code,grant_type:"authorization_code",redirect_uri:redirect,code_verifier:verifier});
+  const body=new URLSearchParams({client_key:key,client_secret:secret,code:code!,grant_type:"authorization_code",redirect_uri:redirect,code_verifier:verifier});
   const response=await fetchWithTimeout("https://open.tiktokapis.com/v2/oauth/token/",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded","cache-control":"no-cache"},body});
   if(!response.ok)return NextResponse.json({error:"TikTok token exchange failed."},{status:502,headers:{"Cache-Control":"no-store"}});
   const token=await response.json();
