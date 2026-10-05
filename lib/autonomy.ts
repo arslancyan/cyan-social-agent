@@ -17,7 +17,6 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
  const recent=await pool.query("SELECT id,content,platform,angle,created_at FROM cyan_drafts WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '7 days' ORDER BY created_at DESC LIMIT 150",[workspaceId()]);
  const recentRows=recent.rows;
  const fatigue=await contentFatigue(recentRows.map((r:any)=>({id:r.id,platform:r.platform,angle:r.angle,content:r.content,status:"draft"} as any)));
- const fatigueIds=new Set(fatigue.map(x=>x.id));
  const recentAngles=new Map<string,number>();
  for(const r of recentRows)recentAngles.set(String(r.platform)+"|"+String(r.angle),(recentAngles.get(String(r.platform)+"|"+String(r.angle))||0)+1);
 
