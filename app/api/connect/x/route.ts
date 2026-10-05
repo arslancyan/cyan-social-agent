@@ -1,9 +1,11 @@
 import {NextResponse} from "next/server";
 import {cookies} from "next/headers";
+import {requireUser} from "@/lib/auth";
 
 function b64url(bytes:Uint8Array){return Buffer.from(bytes).toString("base64url");}
 
 export async function GET(){
+ await requireUser();
  const clientId=process.env.X_CLIENT_ID;
  const redirect=process.env.X_REDIRECT_URI;
  if(!clientId||!redirect) return NextResponse.json({error:"X OAuth is not configured. Set X_CLIENT_ID and X_REDIRECT_URI."},{status:503});
