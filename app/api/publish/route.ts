@@ -1,12 +1,16 @@
 import {NextResponse} from "next/server";
 import {publishDraft} from "@/lib/platforms";
-import {consumeUsage,requireUser,runAsUser} from "@/lib/auth";
+import {consumeUsage,releaseUsage,requireUser,runAsUser} from "@/lib/auth";
+
 export async function POST(req:Request){
  try{
-  const user=await requireUser();const allowed=await consumeUsage(user,"publishes");
-  if(!allowed)return NextResponse.json({error:"Daily publishing limit reached for your plan."},{status:429});
+  const user=await requireUser();
   const b=await req.json().catch(()=>({}));
-  if(!b.draft)return NextResponse.json({error:"draft required"},{status:400});
-  return NextResponse.json(await runAsUser(user,()=>publishDraft(b.draft)));
+  if(!b.draft||typeof b.draft!=="object")return NextResponse.json({error:"draft required"},{status:400});
+  const allowed=await consumeUsage(user,"publishes");
+  if(!allowed)return NextResponse.json({error:"Daily publishing limit reached for your plan."},{status:429});
+  const result=await runAsUser(user,()=>publishDraft(b.draft));
+  if(!result.ok)await releaseUsage(user,"publishes");
+  return NextResponse.json(result);
  }catch{return NextResponse.json({error:"Unauthorized"},{status:401})}
 }
