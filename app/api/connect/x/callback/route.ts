@@ -15,7 +15,7 @@ export async function GET(req:NextRequest){
   if(error){c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");return NextResponse.redirect(new URL("/?connection_error=X",req.url));}
   const code=url.searchParams.get("code"),state=url.searchParams.get("state");
   const expected=c.get("cyan_x_oauth_state")?.value,verifier=c.get("cyan_x_pkce")?.value;
-  if(!code||!state||!expected||state!==expected||!verifier)c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");return NextResponse.json({error:"Invalid OAuth state or missing code"},{status:400,headers:{"Cache-Control":"no-store"}});
+  if(!code||!state||!expected||state!==expected||!verifier){c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");return NextResponse.json({error:"Invalid OAuth state or missing code"},{status:400,headers:{"Cache-Control":"no-store"}});}
   const clientId=process.env.X_CLIENT_ID,redirect=process.env.X_REDIRECT_URI,secret=process.env.X_CLIENT_SECRET;
   if(!clientId||!redirect)return NextResponse.json({error:"X OAuth is not configured"},{status:503,headers:{"Cache-Control":"no-store"}});
   const body=new URLSearchParams({code,grant_type:"authorization_code",redirect_uri:redirect,code_verifier:verifier});
