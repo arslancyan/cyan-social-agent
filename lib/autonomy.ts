@@ -41,7 +41,10 @@ export async function chooseNextIdea():Promise<StrategyDecision|null>{
   return{trend:t,priority,reason,platform,angle,features:strategy.topFeatures.slice(0,3),topic:t.title,exploration:explore,recommendedAt:new Date(Date.now()+30*60000).toISOString(),confidence,memoryScore,novelty,decision};
  }).filter(x=>x.decision!=="avoid"||x.priority>=70).sort((a,b)=>b.priority-a.priority);
  const chosen=candidates[0]||null;
- if(chosen)await pool.query("INSERT INTO cyan_strategy_decisions(workspace_id,trend_id,platform,angle,decision,exploration,priority,confidence,reason,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[workspaceId(),chosen.trend.id,chosen.platform,chosen.angle,chosen.decision,chosen.exploration,chosen.priority,chosen.confidence,chosen.reason,JSON.stringify({memoryScore:chosen.memoryScore,novelty:chosen.novelty})]);
+ if(chosen){
+  const recent=await pool.query("SELECT 1 FROM cyan_strategy_decisions WHERE workspace_id=$1 AND trend_id=$2 AND platform=$3 AND angle=$4 AND created_at>=NOW()-INTERVAL '30 minutes' LIMIT 1",[workspaceId(),chosen.trend.id,chosen.platform,chosen.angle]);
+  if(!recent.rowCount)await pool.query("INSERT INTO cyan_strategy_decisions(workspace_id,trend_id,platform,angle,decision,exploration,priority,confidence,reason,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[workspaceId(),chosen.trend.id,chosen.platform,chosen.angle,chosen.decision,chosen.exploration,chosen.priority,chosen.confidence,chosen.reason,JSON.stringify({memoryScore:chosen.memoryScore,novelty:chosen.novelty})]);
+ }
  return chosen;
 }
 
