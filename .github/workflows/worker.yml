@@ -16,7 +16,7 @@ jobs:
         env:
           CYAN_APP_URL: ${{ vars.CYAN_APP_URL }}
           ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ -z "${CYAN_APP_URL:-}" ]; then
