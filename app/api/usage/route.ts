@@ -21,6 +21,7 @@ export async function GET(){
    publishes:{used:Number(row.publishes),limit:l.publishes,remaining:Math.max(0,l.publishes-Number(row.publishes))}
   });
  }catch(e){
-  return NextResponse.json({error:e instanceof Error?e.message:"Unauthorized"},{status:401});
+  if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});
+  console.error("Usage API failed",e);return NextResponse.json({error:"Usage service unavailable"},{status:503});
  }
 }
