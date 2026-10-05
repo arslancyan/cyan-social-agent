@@ -54,12 +54,17 @@ export async function consumeUsage(user:SessionUser,type:"generations"|"publishe
  const l=limits(user.plan);
  const column=type==="generations"?"generations":"publishes";
  const limit=l[type];
- const r=await pool.query(`SELECT ${column} AS used FROM cyan_usage WHERE user_id=$1 AND day=CURRENT_DATE`,[user.id]);
- const used=Number(r.rows[0]?.used||0);
- if(used>=limit) return false;
- await pool.query(`INSERT INTO cyan_usage(user_id,day,${column}) VALUES($1,CURRENT_DATE,1)
- ON CONFLICT(user_id,day) DO UPDATE SET ${column}=cyan_usage.${column}+1`,[user.id]);
- return true;
+ const r=await pool.query(`INSERT INTO cyan_usage(user_id,day,${column}) VALUES($1,CURRENT_DATE,1)
+ ON CONFLICT(user_id,day) DO UPDATE SET ${column}=cyan_usage.${column}+1
+ WHERE cyan_usage.${column} < $2
+ RETURNING ${column} AS used`,[user.id,limit]);
+ return r.rowCount===1;
+}
+
+export async function releaseUsage(user:SessionUser,type:"generations"|"publishes"){
+ await dbReady();
+ const column=type==="generations"?"generations":"publishes";
+ await pool.query(`UPDATE cyan_usage SET ${column}=GREATEST(0,${column}-1) WHERE user_id=$1 AND day=CURRENT_DATE`,[user.id]);
 }
 
 export async function listAgentUsers(){
