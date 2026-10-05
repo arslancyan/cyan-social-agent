@@ -1,7 +1,11 @@
 import {NextResponse} from "next/server";
 import {saveDrafts} from "@/lib/store";
+import {consumeUsage,requireUser,runAsUser} from "@/lib/auth";
 
 export async function POST(req:Request){
+ const user=await requireUser();
+ const allowed=await consumeUsage(user,"generations");
+ if(!allowed)return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});
  const {topic}=await req.json().catch(()=>({}));
  if(!topic||typeof topic!=="string"||!topic.trim()) return NextResponse.json({error:"Topic is required"},{status:400});
  let drafts:any[]=[];
@@ -20,6 +24,6 @@ export async function POST(req:Request){
   try{drafts=JSON.parse(raw)}catch{drafts=[{platform:"X",angle:"Draft",content:raw}]}
   drafts=drafts.map((d:any)=>({...d,id:d.id||crypto.randomUUID(),status:d.status||"review"}));
  }
- await saveDrafts(drafts);
+ await runAsUser(user,()=>saveDrafts(drafts));
  return NextResponse.json({drafts,source:apiKey?"ai":"fallback"});
 }
