@@ -14,8 +14,8 @@ const clamp=(n:number,a=0,b=100)=>Math.max(a,Math.min(b,n));
 export async function chooseNextIdea():Promise<StrategyDecision|null>{
  await dbReady();
  const [trends,platforms,strategy,budget,patterns,adaptations]=await Promise.all([latestTrends(30),platformPerformanceScores(),generationStrategy(),explorationBudget(),topPatterns(80),platformAdaptationPlans()]);
- const optimized=await rankDecisionCandidates(trends[0],8);
  if(!trends.length)return null;
+ const optimized=await rankDecisionCandidates(trends[0],8);
  const recent=await pool.query("SELECT id,content,platform,angle,created_at FROM cyan_drafts WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '7 days' ORDER BY created_at DESC LIMIT 150",[workspaceId()]);
  const recentRows=recent.rows;
  await contentFatigue(recentRows.map((r:any)=>({id:r.id,platform:r.platform,angle:r.angle,content:r.content,status:"draft"} as any)));
