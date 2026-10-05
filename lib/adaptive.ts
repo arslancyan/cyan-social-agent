@@ -108,19 +108,21 @@ const ADAPTATION_PROFILES:Record<Platform,Omit<PlatformAdaptation,"platform"|"an
 };
 const adaptationClamp=(n:number)=>Math.max(0,Math.min(100,Math.round(n)));
 export async function platformAdaptationPlans():Promise<PlatformAdaptation[]>{
- const [platforms,angles,features,patterns]=await Promise.all([platformPerformanceScores(),anglePerformanceScores(),featurePerformanceScores(),topPatterns(80)]);
- return (PLATFORMS as Platform[]).map(platform=>{
+ const platforms=await platformPerformanceScores();
+ const plans=await Promise.all((PLATFORMS as Platform[]).map(async platform=>{
+  const [angles,features,patterns]=await Promise.all([anglePerformanceScores(platform),featurePerformanceScores(platform),topPatterns(80)]);
   const profile=ADAPTATION_PROFILES[platform],ps=platforms.find(x=>x.platform===platform),angle=angles[0],feature=features.find(x=>x.feature==="hook"),memory=patterns.find(x=>x.patternType==="platform_angle"&&x.patternKey.startsWith(platform+"|"));
   const confidence=adaptationClamp((ps?.confidence||0)*.55+(angle?.confidence||0)*.25+(feature?.confidence||0)*.10+(memory?.confidence||0)*.10);
   const score=adaptationClamp((ps?.score||50)*.45+(angle?.score||55)*.20+(feature?.score||55)*.15+(memory?.score||50)*.20);
   const evidence:string[]=[];
   if(ps?.samples)evidence.push(ps.samples+" official performance snapshots");
-  if(angle)evidence.push("angle "+angle.angle+" score "+angle.score);
-  if(feature)evidence.push("hook feature "+feature.value+" score "+feature.score);
+  if(angle)evidence.push("platform angle "+angle.angle+" score "+angle.score);
+  if(feature)evidence.push("platform hook feature "+feature.value+" score "+feature.score);
   if(memory)evidence.push("creative memory supports this platform");
   if(!evidence.length)evidence.push("cold-start profile; no fabricated performance evidence");
   return {...profile,platform,angle:angle?.angle||"Hook",confidence,score,evidence};
- }).sort((a,b)=>b.score*b.confidence-a.score*a.confidence);
+ }));
+ return plans.sort((a,b)=>b.score*b.confidence-a.score*a.confidence);
 }
 export function adaptationPrompt(plan:PlatformAdaptation,coreIdea:string){
  return ["Platform: "+plan.platform,"Core idea: "+coreIdea,"Preferred angle: "+plan.angle,"Hook: "+plan.hook,"Length: "+plan.length,"Format: "+plan.format,"Media: "+plan.media,"CTA: "+plan.cta,"Tone: "+plan.tone,"Treat these as optimization constraints, not facts. Preserve verified facts and never invent claims.","Evidence: "+plan.evidence.join("; ")].join("\n");
