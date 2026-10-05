@@ -1,17 +1,19 @@
 import {NextResponse} from "next/server";
 import {analyticsSummary} from "@/lib/store";
 import {dbReady,pool} from "@/lib/db";
-import {requireUser,runAsUser} from "@/lib/auth";
+import {requireUser,runAsUser,rateLimit} from "@/lib/auth";
 export const dynamic="force-dynamic";
 export async function POST(req:Request){
  try{
   const user=await requireUser();
+  if(!(await rateLimit("analytics-feedback:"+user.id,60,60)))return NextResponse.json({error:"Feedback rate limit reached."},{status:429});
   const body=await req.json().catch(()=>({}));
   const type=typeof body.type==="string"?body.type:"";
   if(!["content_feedback","publish_feedback"].includes(type))return NextResponse.json({error:"Invalid feedback type"},{status:400});
   const draftId=typeof body.draftId==="string"&&body.draftId.length<=200?body.draftId:undefined;
   const platform=typeof body.platform==="string"&&body.platform.length<=40?body.platform:undefined;
   const metadata=body.metadata&&typeof body.metadata==="object"?body.metadata:{};
+  if(JSON.stringify(metadata).length>4000)return NextResponse.json({error:"Feedback metadata is too large."},{status:400});
   return NextResponse.json(await runAsUser(user,async()=>{await dbReady();await pool.query("INSERT INTO cyan_events(workspace_id,type,platform,draft_id,metadata) VALUES($1,$2,$3,$4,$5)",[user.id,type,platform||null,draftId||null,JSON.stringify(metadata)]);return {ok:true};}));
  }catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Analytics feedback failed",e);return NextResponse.json({error:"Analytics unavailable"},{status:503});}
 }
