@@ -8,5 +8,5 @@ export async function POST(req:Request){
   const {topic}=await req.json().catch(()=>({}));
   if(typeof topic!=="string"||!topic.trim())return NextResponse.json({error:"Topic required"},{status:400});
   return NextResponse.json({drafts:buildDrafts(topic.trim())});
- }catch{return NextResponse.json({error:"Unauthorized"},{status:401})}
+ }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Queue API failed",e);return NextResponse.json({error:"Queue service unavailable"},{status:503})}
 }
