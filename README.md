@@ -22,7 +22,7 @@ The public product is designed for multi-user accounts, subscriptions, per-user 
 Social publishing is gated behind official platform APIs and user authorization. CYAN does not use browser automation or attempt to evade anti-spam/bot-detection controls.
 
 ## Cloud worker
-`vercel.json` defines a once-per-minute worker tick at `/api/worker/tick`. The dashboard controls the persistent `cyan_control` state; PostgreSQL stores drafts, trends and worker runs. Set `DATABASE_URL` and either `CRON_SECRET` or `CYAN_WORKER_SECRET` before production use.
+`vercel.json` defines a daily fallback worker tick at `/api/worker/tick` for Vercel Hobby. A free GitHub Actions worker also calls the same endpoint every 5 minutes. The dashboard controls the persistent `cyan_control` state; PostgreSQL stores drafts, trends and worker runs. Set `DATABASE_URL` and either `CRON_SECRET` or `CYAN_WORKER_SECRET` before production use. For the GitHub Actions worker, configure repository variable `CYAN_APP_URL` and repository secret `CYAN_WORKER_SECRET`; the latter must match the Vercel secret.
 
 When `TREND_SOURCE_URL` is configured, the worker expects JSON shaped like `{ "trends": [{ "id", "title", "summary", "views", "velocity", "engagement", "freshness", "relevance", "sourceUrl" }] }`, scores each signal, stores it, and may reprioritize flexible scheduled posts when the viral threshold is reached. The actual social publishing adapters still require official OAuth/API connections.
 
@@ -49,5 +49,5 @@ For a production SaaS, the next security layer is user authentication and tenant
 
 ## Deployment
 
-The repository includes a Vercel Cron entry for `/api/worker/tick`. Vercel supports cron-triggered Functions; current Vercel documentation notes that minute-level cron precision is available on Pro/Enterprise, while Hobby has lower scheduling precision. For a 24/7 social agent that needs frequent trend checks, deploy the production worker on an appropriate plan or a dedicated worker service.
+The repository includes a Vercel Cron entry for `/api/worker/tick`. Vercel supports cron-triggered Functions; current Vercel documentation notes that minute-level cron precision is available on Pro/Enterprise, while Hobby has lower scheduling precision. For frequent trend checks on a free setup, GitHub Actions provides the current 5-minute worker cadence. Scheduled GitHub Actions can be delayed, so this is not hard real-time. Upgrade the worker infrastructure later if tighter timing is required.
 
