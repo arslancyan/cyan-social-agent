@@ -24,7 +24,7 @@ export async function GET(req:NextRequest){
   let label:string|undefined;
   const me=await fetchWithTimeout("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name",{headers:{authorization:"Bearer "+token.access_token}});
   if(me.ok){const d=await me.json();label=d.data?.user?.display_name||d.data?.display_name||undefined;}
-  await runAsUser(user,()=>saveConnection("TikTok",await encryptSecret(token.access_token),token.refresh_token?await encryptSecret(token.refresh_token):"",label));
+  const accessToken=await encryptSecret(token.access_token); const refreshToken=token.refresh_token?await encryptSecret(token.refresh_token):""; await runAsUser(user,()=>saveConnection("TikTok",accessToken,refreshToken,label));
   c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");
   return NextResponse.redirect(new URL("/?connected=TikTok",req.url));
  }catch(e){
