@@ -95,4 +95,34 @@ export async function autoScheduleAdaptive(draftIds:string[],mode:"smart"|"auton
  return{scheduled,plans};
 }
 
+export type PlatformAdaptation={
+ platform:Platform; hook:string; length:"short"|"medium"|"long"; cta:string;
+ format:string; media:"text"|"image"|"video"; tone:string; angle:string;
+ confidence:number; score:number; evidence:string[];
+};
+const ADAPTATION_PROFILES:Record<Platform,Omit<PlatformAdaptation,"platform"|"angle"|"confidence"|"score"|"evidence">>={
+ X:{hook:"sharp concise hook",length:"short",cta:"specific question or useful opinion",format:"post/thread",media:"image",tone:"direct conversational insight-first"},
+ TikTok:{hook:"front-load curiosity or payoff",length:"medium",cta:"simple comment or retention prompt",format:"short-video",media:"video",tone:"fast visual energetic retention-first"},
+ Instagram:{hook:"clear first visual or caption line",length:"medium",cta:"invite saves shares or focused comment",format:"reel/carousel/caption",media:"image",tone:"visual-first polished concise"},
+ Facebook:{hook:"give context and why it matters",length:"long",cta:"invite substantive discussion",format:"post/video",media:"image",tone:"context-rich approachable discussion-first"}
+};
+const adaptationClamp=(n:number)=>Math.max(0,Math.min(100,Math.round(n)));
+export async function platformAdaptationPlans():Promise<PlatformAdaptation[]>{
+ const [platforms,angles,features,patterns]=await Promise.all([platformPerformanceScores(),anglePerformanceScores(),featurePerformanceScores(),topPatterns(80)]);
+ return (PLATFORMS as Platform[]).map(platform=>{
+  const profile=ADAPTATION_PROFILES[platform],ps=platforms.find(x=>x.platform===platform),angle=angles[0],feature=features.find(x=>x.feature==="hook"),memory=patterns.find(x=>x.patternType==="platform_angle"&&x.patternKey.startsWith(platform+"|"));
+  const confidence=adaptationClamp((ps?.confidence||0)*.55+(angle?.confidence||0)*.25+(feature?.confidence||0)*.10+(memory?.confidence||0)*.10);
+  const score=adaptationClamp((ps?.score||50)*.45+(angle?.score||55)*.20+(feature?.score||55)*.15+(memory?.score||50)*.20);
+  const evidence:string[]=[];
+  if(ps?.samples)evidence.push(ps.samples+" official performance snapshots");
+  if(angle)evidence.push("angle "+angle.angle+" score "+angle.score);
+  if(feature)evidence.push("hook feature "+feature.value+" score "+feature.score);
+  if(memory)evidence.push("creative memory supports this platform");
+  if(!evidence.length)evidence.push("cold-start profile; no fabricated performance evidence");
+  return {...profile,platform,angle:angle?.angle||"Hook",confidence,score,evidence};
+ }).sort((a,b)=>b.score*b.confidence-a.score*a.confidence);
+}
+export function adaptationPrompt(plan:PlatformAdaptation,coreIdea:string){
+ return ["Platform: "+plan.platform,"Core idea: "+coreIdea,"Preferred angle: "+plan.angle,"Hook: "+plan.hook,"Length: "+plan.length,"Format: "+plan.format,"Media: "+plan.media,"CTA: "+plan.cta,"Tone: "+plan.tone,"Treat these as optimization constraints, not facts. Preserve verified facts and never invent claims.","Evidence: "+plan.evidence.join("; ")].join("\n");
+}
 export async function createExperiment(topic:string,drafts:Draft[]){await dbReady();if(drafts.length<2)return null;const id=crypto.randomUUID();await pool.query("INSERT INTO cyan_experiments(id,workspace_id,topic) VALUES($1,$2,$3)",[id,workspaceId(),topic.slice(0,500)]);const variants=["A","B","C","D"];for(let i=0;i<drafts.length;i++){const variant=variants[i]||String.fromCharCode(65+i);drafts[i].experimentId=id;drafts[i].variant=variant;await pool.query("UPDATE cyan_drafts SET experiment_id=$1,variant=$2 WHERE workspace_id=$3 AND id=$4",[id,variant,workspaceId(),drafts[i].id]);}return{id,variants:drafts.map((d,i)=>({draftId:d.id,variant:d.variant||String.fromCharCode(65+i)}))};}
