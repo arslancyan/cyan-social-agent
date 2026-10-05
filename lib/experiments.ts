@@ -18,7 +18,11 @@ export async function evaluateExperiments(){
   if(mature.length<2)continue;
   const winner=mature.sort((a,b)=>Number(b.score)-Number(a.score))[0];
   const u=await pool.query("UPDATE cyan_experiments SET status='completed',winner_draft_id=$1,winner_score=$2 WHERE workspace_id=$3 AND id=$4 AND status='active' RETURNING id",[winner.draft_id,Number(winner.score),workspaceId(),id]);
-  if(u.rows[0])completed.push({id,topic:rows[0].topic,winnerDraftId:winner.draft_id,winnerScore:Number(winner.score)});
+  if(u.rows[0]){
+ const draft=rows.find(x=>x.draft_id===winner.draft_id);
+ completed.push({id,topic:rows[0].topic,winnerDraftId:winner.draft_id,winnerScore:Number(winner.score),variant:winner.variant});
+ await pool.query("INSERT INTO cyan_events(workspace_id,type,platform,draft_id,metadata) SELECT $1,'experiment_winner',d.platform,d.id,$2::jsonb FROM cyan_drafts d WHERE d.workspace_id=$1 AND d.id=$3",[workspaceId(),JSON.stringify({experimentId:id,topic:rows[0].topic,score:Number(winner.score),variant:winner.variant,features:draft?.features||{},angle:draft?.angle||null}),winner.draft_id]);
+}
  }
  return completed;
 }
