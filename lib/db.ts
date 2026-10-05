@@ -45,11 +45,12 @@ export async function dbReady(){
     id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT 'local',
     platform TEXT NOT NULL, angle TEXT NOT NULL, content TEXT NOT NULL,
     status TEXT NOT NULL, scheduled_at TIMESTAMPTZ NULL, trend_id TEXT NULL,
-    protected BOOLEAN NOT NULL DEFAULT FALSE, media_url TEXT NULL, media_type TEXT NULL,
+    protected BOOLEAN NOT NULL DEFAULT FALSE, media_url TEXT NULL, media_type TEXT NULL, external_id TEXT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
    ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_url TEXT NULL;
    ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_type TEXT NULL;
+   ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS external_id TEXT NULL;
    CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(status, scheduled_at);
    CREATE TABLE IF NOT EXISTS cyan_control (
     workspace_id TEXT PRIMARY KEY, mode TEXT NOT NULL DEFAULT 'smart',
