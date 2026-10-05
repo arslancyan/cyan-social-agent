@@ -25,7 +25,11 @@ export async function dbReady(){
     expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
    CREATE INDEX IF NOT EXISTS cyan_sessions_exp_idx ON cyan_sessions(expires_at);
-   CREATE TABLE IF NOT EXISTS cyan_rate_limits (\n    key TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, reset_at TIMESTAMPTZ NOT NULL\n   );\n   CREATE INDEX IF NOT EXISTS cyan_rate_limits_reset_idx ON cyan_rate_limits(reset_at);\n   CREATE TABLE IF NOT EXISTS cyan_usage (
+   CREATE TABLE IF NOT EXISTS cyan_rate_limits (
+    key TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, reset_at TIMESTAMPTZ NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS cyan_rate_limits_reset_idx ON cyan_rate_limits(reset_at);
+   CREATE TABLE IF NOT EXISTS cyan_usage (
     user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,
     day DATE NOT NULL, generations INTEGER NOT NULL DEFAULT 0, publishes INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(user_id,day)
