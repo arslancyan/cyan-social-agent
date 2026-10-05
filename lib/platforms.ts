@@ -74,7 +74,7 @@ async function publishTikTok(draft:Draft):Promise<PublishResult>{
    return{platform:"TikTok",ok:false,pending:true,message:"TikTok is still processing the publish request.",externalId:draft.externalId};
   }
   let creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"});
-  if(creator.status===401){await refresh();creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}");}
+  if(creator.status===401){await refresh();creator=await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"});}
   const creatorData=await creator.json().catch(()=>({}));
   if(!creator.ok||creatorData?.error?.code!=="ok")return{platform:"TikTok",ok:false,message:creatorData?.error?.message||"TikTok creator information could not be queried."};
   const options=creatorData.data?.privacy_level_options||[];
