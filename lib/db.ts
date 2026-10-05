@@ -40,6 +40,7 @@ export async function dbReady(){
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
    );
    CREATE INDEX IF NOT EXISTS cyan_events_workspace_idx ON cyan_events(workspace_id,created_at DESC);
+   CREATE INDEX IF NOT EXISTS cyan_events_platform_time_idx ON cyan_events(workspace_id,platform,created_at DESC);
    CREATE TABLE IF NOT EXISTS cyan_subscriptions (
     user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL DEFAULT 'none', customer_id TEXT NULL, subscription_id TEXT NULL,
