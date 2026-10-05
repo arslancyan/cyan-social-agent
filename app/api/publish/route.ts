@@ -8,7 +8,10 @@ export async function POST(req:Request){
   const user=await requireUser();
   if(!(await rateLimit("publish:"+user.id,30,60)))return NextResponse.json({error:"Publishing rate limit reached. Try again shortly."},{status:429});
   const b=await req.json().catch(()=>({}));
-  if(!b.draft||typeof b.draft!=="object")return NextResponse.json({error:"draft required"},{status:400});
+  if(!b.draft||typeof b.draft!=="object"||typeof b.draft.id!=="string"||b.draft.id.length>200)return NextResponse.json({error:"A valid draft id is required"},{status:400});
+  const draft=await runAsUser(user,()=>getDraft(b.draft.id));
+  if(!draft)return NextResponse.json({error:"Draft not found"},{status:404});
+  if(!["draft","review","scheduled"].includes(draft.status))return NextResponse.json({error:"Only draft, review, or scheduled posts can be published manually."},{status:409});
   const allowed=await consumeUsage(user,"publishes");
   if(!allowed)return NextResponse.json({error:"Daily publishing limit reached for your plan."},{status:429});
   const result=await runAsUser(user,()=>publishDraft(draft));
