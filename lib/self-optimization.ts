@@ -90,7 +90,7 @@ export async function calibrateLearning():Promise<{updates:number;averageError:n
   if(count===0)return {updates:0,averageError:0,bias:0};
   const averageError=Number((total/count).toFixed(2)),meanBias=Number((bias/count).toFixed(2));
   const recent=await pool.query("SELECT 1 FROM cyan_events WHERE workspace_id=$1 AND type='learning_update' AND created_at>=NOW()-INTERVAL '6 hours' LIMIT 1",[workspaceId()]);
-  if(!recent.rowCount)await pool.query(`INSERT INTO cyan_events(workspace_id,type,metadata) VALUES($1,'learning_update',$2)`,[workspaceId(),JSON.stringify({source:"official_api",schemaVersion:2,windows:["24h","72h"],samples:count,averageAbsoluteError:averageError,bias:meanBias,predictionSource:"event_metadata_or_baseline",updatedAt:new Date().toISOString()})]);
+  if(!recent.rowCount)await pool.query(`INSERT INTO cyan_events(workspace_id,type,metadata) VALUES($1,'learning_update',$2)`,[workspaceId(),JSON.stringify({source:"official_api",schemaVersion:2,windows:["24h","72h"],samples:count,averageAbsoluteError:averageError,bias:meanBias,predictionSource:"adaptive_decision",updatedAt:new Date().toISOString()})]);
   return {updates:count,averageError,bias:meanBias};
 }
 
