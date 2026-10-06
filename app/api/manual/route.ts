@@ -1,4 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
+import {isIP} from "net";
 import {addManualDraft} from "@/lib/store";
 import {Draft,Platform} from "@/lib/types";
 import {requireUser,runAsUser,rateLimit,requireWorkspaceRole} from "@/lib/auth";
@@ -13,7 +14,13 @@ function isSafeMediaUrl(value:string){
   if(host==="localhost"||host.endsWith(".localhost")||host==="metadata.google.internal"||host==="metadata.google"){
    return false;
   }
-  if(host==="127.0.0.1"||host==="0.0.0.0"||host==="::1"||host.startsWith("169.254."))return false;
+  const ipKind=isIP(host);
+  if(ipKind===6){
+   const normalized=host.toLowerCase();
+   if(normalized==="::1"||normalized==="::"||normalized.startsWith("fc")||normalized.startsWith("fd")||normalized.startsWith("fe8")||normalized.startsWith("fe9")||normalized.startsWith("fea")||normalized.startsWith("feb")||normalized.startsWith("ff"))return false;
+   const mapped=normalized.match(/^::ffff:(\\d+\\.\\d+\\.\\d+\\.\\d+)$/);
+   if(mapped){const m=mapped[1].split(".").map(Number);const [a,b]=m;if(a===10||a===127||a===0||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&b===168)return false;}
+  } else if(ipKind===4 && (host==="0.0.0.0"||host.startsWith("169.254.")))return false;
   const ipv4=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
   if(ipv4){
    const n=ipv4.slice(1).map(Number);
