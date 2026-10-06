@@ -13,7 +13,13 @@ export async function POST(req:Request){
   if(!allowed)return NextResponse.json({error:"Daily publishing limit reached for your plan."},{status:429});
   const draft=await runAsUser(user,()=>claimManualPublish(b.draft.id));
   if(!draft){await releaseUsage(user,"publishes");return NextResponse.json({error:"Draft is no longer available for publishing."},{status:409});}
-  const result=await runAsUser(user,()=>publishDraft(draft));
+  let result:Awaited<ReturnType<typeof publishDraft>>;
+  try{result=await runAsUser(user,()=>publishDraft(draft));}catch(e){
+   await releaseUsage(user,"publishes");
+   await runAsUser(user,()=>updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString(),null));
+   await runAsUser(user,()=>recordEvent("publish_failed",{draftId:draft.id,platform:draft.platform,metadata:{message:e instanceof Error?e.message:"Unexpected publish failure",retryable:true,source:"manual_publish_exception"}}));
+   return NextResponse.json({platform:draft.platform,ok:false,retryable:true,message:"Publishing provider failed unexpectedly; the post was returned to the retry queue."},{status:502});
+  }
   if(result.ok){
    await runAsUser(user,()=>updateStatus(draft.id,"published",undefined,result.externalId));
   }else if(result.pending&&result.externalId){
