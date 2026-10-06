@@ -62,6 +62,7 @@ CREATE INDEX IF NOT EXISTS cyan_strategy_decisions_workspace_idx ON cyan_strateg
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
 ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta';
+ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS approval_required BOOLEAN NOT NULL DEFAULT FALSE;
 `);})().catch(err=>{globalThis.__cyanSchemaPromise=undefined;throw err;}); return globalThis.__cyanSchemaPromise;
 }
 export {pool};
