@@ -48,8 +48,9 @@ CREATE TABLE IF NOT EXISTS cyan_patterns(id TEXT PRIMARY KEY,workspace_id TEXT N
 CREATE UNIQUE INDEX IF NOT EXISTS cyan_patterns_workspace_type_key_idx ON cyan_patterns(workspace_id,pattern_type,pattern_key);
 CREATE INDEX IF NOT EXISTS cyan_patterns_workspace_score_idx ON cyan_patterns(workspace_id,score DESC,updated_at DESC);
 CREATE TABLE IF NOT EXISTS cyan_workspaces(id TEXT PRIMARY KEY,owner_user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS cyan_workspace_members(workspace_id TEXT NOT NULL REFERENCES cyan_workspaces(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,role TEXT NOT NULL DEFAULT 'member',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(workspace_id,user_id));
+CREATE TABLE IF NOT EXISTS cyan_workspace_members(workspace_id TEXT NOT NULL REFERENCES cyan_workspaces(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,role TEXT NOT NULL DEFAULT 'viewer',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(workspace_id,user_id));
 CREATE INDEX IF NOT EXISTS cyan_workspace_members_user_idx ON cyan_workspace_members(user_id);
+UPDATE cyan_workspace_members SET role='viewer' WHERE role='member';
 CREATE TABLE IF NOT EXISTS cyan_inbox_threads(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,platform TEXT NOT NULL,external_thread_id TEXT NOT NULL,account_label TEXT NULL,participant_label TEXT NULL,status TEXT NOT NULL DEFAULT 'open',priority TEXT NOT NULL DEFAULT 'normal',assigned_to TEXT NULL,last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),metadata JSONB NOT NULL DEFAULT '{}'::jsonb);
 CREATE UNIQUE INDEX IF NOT EXISTS cyan_inbox_threads_workspace_platform_ext_idx ON cyan_inbox_threads(workspace_id,platform,external_thread_id);
 CREATE INDEX IF NOT EXISTS cyan_inbox_threads_workspace_status_idx ON cyan_inbox_threads(workspace_id,status,last_message_at DESC);
