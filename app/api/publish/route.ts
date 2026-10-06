@@ -20,7 +20,11 @@ export async function POST(req:Request){
    await runAsUser(user,()=>updateStatus(draft.id,"scheduled",new Date(Date.now()+5*60*1000).toISOString(),result.externalId));
   }else{
    await releaseUsage(user,"publishes");
-   await runAsUser(user,()=>updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString(),null));
+   if(result.retryable===false){
+    await runAsUser(user,()=>updateStatus(draft.id,"review",undefined,null));
+   }else{
+    await runAsUser(user,()=>updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString(),null));
+   }
   }
   return NextResponse.json(result);
  }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Publish API failed",e);return NextResponse.json({error:"Publishing service unavailable"},{status:503})}
