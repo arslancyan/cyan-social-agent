@@ -67,4 +67,12 @@ ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT
 ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS approval_required BOOLEAN NOT NULL DEFAULT FALSE;
 `);})().catch(err=>{globalThis.__cyanSchemaPromise=undefined;throw err;}); return globalThis.__cyanSchemaPromise;
 }
+export async function withWorkerLock<T>(fn:()=>Promise<T>):Promise<T|null>{
+ const client=await pool.connect();
+ try{
+  const lock=await client.query("SELECT pg_try_advisory_lock(hashtext('cyan-worker-global')) AS locked");
+  if(!lock.rows[0]?.locked)return null;
+  try{return await fn();}finally{await client.query("SELECT pg_advisory_unlock(hashtext('cyan-worker-global'))");}
+ }finally{client.release();}
+}
 export {pool};
