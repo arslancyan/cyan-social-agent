@@ -12,7 +12,10 @@ export async function GET(req:Request){
 }
 export async function PATCH(req:Request){
  try{const user=await requireUser();if(!(await rateLimit("inbox-write:"+user.id,60,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});const body=await req.json().catch(()=>({}));const id=typeof body.id==="string"?body.id:"",assignedTo=typeof body.assignedTo==="string"?body.assignedTo.trim():undefined,status=typeof body.status==="string"?body.status:"",priority=typeof body.priority==="string"?body.priority:"";
-  if(!id||(!["open","pending","resolved"].includes(status)&&!["normal","high","urgent"].includes(priority)&&assignedTo===undefined))return NextResponse.json({error:"Invalid inbox update"},{status:400});
+  if(!id)return NextResponse.json({error:"Invalid inbox update"},{status:400});
+  if(status&&!["open","pending","resolved"].includes(status))return NextResponse.json({error:"Invalid inbox status"},{status:400});
+  if(priority&&!["normal","high","urgent"].includes(priority))return NextResponse.json({error:"Invalid inbox priority"},{status:400});
+  if(assignedTo===undefined&&!status&&!priority)return NextResponse.json({error:"No inbox update supplied"},{status:400});
   return NextResponse.json(await runAsUser(user,async()=>{await dbReady();await requireWorkspaceRole(user.id,assignedTo!==undefined?["owner","admin"]:["owner","admin","editor","approver","member","viewer"]);
    if(assignedTo!==undefined&&assignedTo){const member=await pool.query("SELECT 1 FROM cyan_workspace_members WHERE workspace_id=$1 AND user_id=$2",[user.id,assignedTo]);if(!member.rowCount)throw new Error("Assignee is not a workspace member");}
    const r=await pool.query(`UPDATE cyan_inbox_threads SET assigned_to=CASE WHEN $4::boolean THEN NULLIF($5::text,'') ELSE assigned_to END,status=CASE WHEN $2='' THEN status ELSE $2 END,priority=CASE WHEN $3='' THEN priority ELSE $3 END WHERE id=$1 AND workspace_id=$6 RETURNING *`,[id,status,priority,assignedTo!==undefined,assignedTo||"",user.id]);if(!r.rows[0])throw new Error("Inbox thread not found");return{thread:r.rows[0]};
