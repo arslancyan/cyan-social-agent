@@ -2,7 +2,7 @@ import {Draft,Platform} from "./types";
 import {decryptSecret,encryptSecret} from "./crypto";
 import {getConnectionSecret,updateConnectionTokens} from "./store";
 
-export interface PublishResult { platform:Platform; ok:boolean; message:string; externalId?:string; pending?:boolean; }
+export interface PublishResult { platform:Platform; ok:boolean; message:string; externalId?:string; pending?:boolean; retryable?:boolean; }
 
 async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeoutMs=15000){
  const controller=new AbortController();
@@ -25,7 +25,7 @@ async function postX(token:string,text:string){
 }
 async function publishX(draft:Draft):Promise<PublishResult>{
  const connection=await getConnectionSecret("X");
- if(!connection?.access_token_enc)return{platform:"X",ok:false,message:"X is not connected."};
+ if(!connection?.access_token_enc)return{platform:"X",ok:false,retryable:false,message:"X is not connected."};
  try{
   let token=await decryptSecret(connection.access_token_enc);
   let response=await postX(token,draft.content);
@@ -55,7 +55,7 @@ async function refreshTikTok(refreshToken:string){
 async function publishTikTok(draft:Draft):Promise<PublishResult>{
  const connection=await getConnectionSecret("TikTok");
  if(!connection?.access_token_enc)return{platform:"TikTok",ok:false,message:"TikTok is not connected."};
- if(!draft.mediaUrl||draft.mediaType!=="video")return{platform:"TikTok",ok:false,message:"TikTok Direct Post needs a public video URL. Add a media URL to this scheduled post."};
+ if(!draft.mediaUrl||draft.mediaType!=="video")return{platform:"TikTok",ok:false,retryable:false,message:"TikTok Direct Post needs a public video URL. Add a media URL to this scheduled post."};
  try{
   let token=await decryptSecret(connection.access_token_enc);
   const refresh=async()=>{
@@ -93,5 +93,5 @@ async function publishTikTok(draft:Draft):Promise<PublishResult>{
 export async function publishDraft(draft:Draft):Promise<PublishResult>{
  if(draft.platform==="X")return publishX(draft);
  if(draft.platform==="TikTok")return publishTikTok(draft);
- return{platform:draft.platform,ok:false,message:"Connector not configured yet. Connect the official platform OAuth/API before publishing."};
+ return{platform:draft.platform,ok:false,retryable:false,message:"Connector not configured yet. Connect the official platform OAuth/API before publishing."};
 }
