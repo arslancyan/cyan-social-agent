@@ -21,7 +21,8 @@ export async function POST(req:Request){
   }else{
    await releaseUsage(user,"publishes");
    if(result.retryable===false){
-    await runAsUser(user,()=>updateStatus(draft.id,"review",undefined,null));\n    await runAsUser(user,()=>recordEvent("publish_blocked",draft.id,draft.platform,{reason:result.error||"Non-retryable publish failure",retryable:false,source:"manual_publish"}));
+    await runAsUser(user,()=>updateStatus(draft.id,"review",undefined,null));
+    await runAsUser(user,()=>recordEvent("publish_blocked",draft.id,draft.platform,{reason:result.error||"Non-retryable publish failure",retryable:false,source:"manual_publish"}));
    }else{
     await runAsUser(user,()=>updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString(),null));
    }
