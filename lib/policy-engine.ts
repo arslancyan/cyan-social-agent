@@ -13,7 +13,10 @@ export async function evaluatePolicy(trend:any, mode:"human"|"smart"|"autonomous
   if(mode==="human")return{action:"wait",score:50,confidence:100,reason:"Human mode does not autonomously act.",expectedOutcome:0,exploration:false};
   const [candidates,budget]=await Promise.all([rankDecisionCandidates(trend,12),explorationBudget()]);
   if(!candidates.length)return{action:"wait",score:0,confidence:0,reason:"No valid candidate with available evidence.",expectedOutcome:0,exploration:false};
-  const best=candidates[0], exploration=best.confidence<55||budget.needExploration;
+  const best=candidates[0];
+  if(mode==="autonomous"&&!trend?.sourceUrl)return{action:"wait",score:best.expectedScore,confidence:best.confidence,reason:"Autonomous action requires a verified trend source URL.",expectedOutcome:best.expectedScore,exploration:false};
+  if(best.confidence<35)return{action:"wait",score:best.expectedScore,confidence:best.confidence,reason:"Evidence confidence is below the autonomous safety floor.",expectedOutcome:best.expectedScore,exploration:false};
+  const exploration=best.confidence<55||budget.needExploration;
   if(best.expectedScore<55)return{action:"wait",score:best.expectedScore,confidence:best.confidence,reason:"Expected outcome is below the autonomous action threshold.",expectedOutcome:best.expectedScore,exploration};
   if(exploration)return{action:"explore",score:best.expectedScore,confidence:best.confidence,reason:"Use a bounded exploration slot to improve evidence while preserving the proven portfolio.",expectedOutcome:best.expectedScore,exploration:true};
   if(best.expectedScore>=78&&best.confidence>=65)return{action:"schedule",score:best.expectedScore,confidence:best.confidence,reason:"High expected outcome with sufficient evidence; schedule using the optimized candidate.",expectedOutcome:best.expectedScore,exploration:false};
