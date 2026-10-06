@@ -91,7 +91,7 @@ export async function syncPublishedPerformance(drafts:Draft[]){
   if(draft.platform==="X")result=await syncX(draft);
   else if(draft.platform==="TikTok")result=await syncTikTok(draft);
   if(!result.ok){results.push({draftId:draft.id,platform:draft.platform,ok:false,message:result.message});continue;}
-  const prediction=await pool.query("SELECT metadata FROM cyan_events WHERE workspace_id=$1 AND draft_id=$2 AND type='adaptive_decision' ORDER BY created_at DESC LIMIT 1",[workspaceId(),draft.id]);
+  const prediction=await pool.query("SELECT metadata FROM cyan_events WHERE workspace_id=$1 AND draft_id=$2 AND type='adaptive_decision' AND metadata->>'recommendedAt' IS NOT NULL ORDER BY created_at DESC LIMIT 1",[workspaceId(),draft.id]);
   const expectedOutcome=prediction.rows[0]?.metadata?.expectedOutcome;
   const predictionSource=Number.isFinite(Number(expectedOutcome))?"adaptive_decision":undefined;
   await recordEvent("performance_snapshot",{platform:draft.platform,draftId:draft.id,externalId:draft.externalId,metadata:{...result.metrics,window,syncedAt:new Date().toISOString(),source:"official_api",schemaVersion:1,...(predictionSource?{expectedOutcome:Number(expectedOutcome),predictionSource}: {})}});
