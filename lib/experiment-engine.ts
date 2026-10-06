@@ -14,10 +14,10 @@ export async function evolveExperiments(){
  await pool.query(`UPDATE cyan_experiments SET status='expired' WHERE workspace_id=$1 AND status='active' AND created_at<NOW()-INTERVAL '7 days'`,[ws]);
  await pool.query(`UPDATE cyan_drafts d SET status='review',scheduled_at=NULL WHERE d.workspace_id=$1 AND d.experiment_id IN (SELECT id FROM cyan_experiments WHERE workspace_id=$1 AND status='expired') AND d.status='scheduled' AND d.protected=false`,[ws]);
  const r=await pool.query(`SELECT e.id,e.topic,d.id draft_id,d.status,d.protected,d.variant,d.platform,d.exploration,
-   MAX(CASE WHEN ev.metadata->>'window'='24h' THEN ev.metadata END) m24,
-   MAX(CASE WHEN ev.metadata->>'window'='72h' THEN ev.metadata END) m72
+   (SELECT metadata FROM cyan_events ev24 WHERE ev24.workspace_id=d.workspace_id AND ev24.draft_id=d.id AND ev24.type='performance_snapshot' AND ev24.metadata->>'window'='24h' ORDER BY ev24.created_at DESC LIMIT 1) m24,
+   (SELECT metadata FROM cyan_events ev72 WHERE ev72.workspace_id=d.workspace_id AND ev72.draft_id=d.id AND ev72.type='performance_snapshot' AND ev72.metadata->>'window'='72h' ORDER BY ev72.created_at DESC LIMIT 1) m72
  FROM cyan_experiments e JOIN cyan_drafts d ON d.experiment_id=e.id
- LEFT JOIN cyan_events ev ON ev.workspace_id=d.workspace_id AND ev.draft_id=d.id AND ev.type='performance_snapshot'
+
  WHERE e.workspace_id=$1 AND e.status='active'
  GROUP BY e.id,e.topic,d.id,d.status,d.protected,d.variant,d.platform,d.exploration
  ORDER BY e.created_at ASC`,[ws]);
