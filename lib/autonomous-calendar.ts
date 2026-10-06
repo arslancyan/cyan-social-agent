@@ -3,6 +3,7 @@ import {workspaceId} from "./auth";
 import {getControl} from "./store";
 import {adaptivePlan} from "./adaptive";
 import {Draft} from "./types";
+import {recordEvent} from "./store";
 
 type CalendarSlot={draftId:string;platform:string;score:number;confidence:number;scheduledAt:string;allocation:"exploitation"|"exploration";reason:string};
 
@@ -48,7 +49,8 @@ export async function allocateAutonomousCalendar(drafts:Draft[],explorationIds:S
   chosen.push({draftId:p.draftId,platform:p.platform,score:p.score,confidence:p.confidence,scheduledAt:at.toISOString(),allocation,reason:allocation==="exploration"?"Reserved as an exploration slot to gather new evidence.":"Allocated to the strongest learned platform/angle/time combination."});
  }
  for(const s of chosen){
-  await pool.query("UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND status IN ('draft','review') AND protected=false",[s.scheduledAt,workspaceId(),s.draftId]);
+  const updated=await pool.query("UPDATE cyan_drafts SET status='scheduled',scheduled_at=$1 WHERE workspace_id=$2 AND id=$3 AND status IN ('draft','review') AND protected=false RETURNING id",[s.scheduledAt,workspaceId(),s.draftId]);
+  if(updated.rowCount)await recordEvent("adaptive_decision",{platform:s.platform,draftId:s.draftId,metadata:{score:s.score,confidence:s.confidence,expectedOutcome:s.score,scheduledAt:s.scheduledAt,allocation:s.allocation,source:"autonomous_calendar"}});
  }
  return{scheduled:chosen,plans,allocation:{exploitation:chosen.filter(x=>x.allocation==="exploitation").length,exploration:chosen.filter(x=>x.allocation==="exploration").length}};
 }
