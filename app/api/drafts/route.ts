@@ -26,6 +26,7 @@ export async function POST(req:Request){
   }
  }catch(e){
   if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(e instanceof Error&&e.message==="FORBIDDEN")return NextResponse.json({error:"Forbidden"},{status:403});
   console.error("Draft POST failed",e);
   return NextResponse.json({error:"Draft service unavailable"},{status:503});
  }
