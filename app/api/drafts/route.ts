@@ -32,6 +32,18 @@ export async function POST(req:Request){
  }
 }
 
+export async function PUT(req:Request){
+ try{
+  const u=await requireUser();const b=await req.json().catch(()=>({}));
+  const ids=Array.isArray(b.ids)?b.ids.filter((x:any)=>typeof x==="string").slice(0,50):[];
+  const status=b.status;
+  if(!ids.length||!["draft","review","scheduled"].includes(status))return NextResponse.json({error:"ids and a valid status are required"},{status:400});
+  if(status==="scheduled"&&(typeof b.scheduledAt!=="string"||Number.isNaN(Date.parse(b.scheduledAt))||new Date(b.scheduledAt).getTime()<=Date.now()))return NextResponse.json({error:"scheduledAt must be a valid future time"},{status:400});
+  const result=await runAsUser(u,async()=>{const updated:any[]=[];for(const id of ids){const d=await updateStatus(id,status,b.scheduledAt);if(d)updated.push(d)}return updated});
+  return NextResponse.json({updated:result,count:result.length});
+ }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Draft bulk update failed",e);return NextResponse.json({error:"Draft service unavailable"},{status:503})}
+}
+
 export async function PATCH(req:Request){
  try{
   const u=await requireUser();
