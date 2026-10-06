@@ -31,7 +31,11 @@ ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS features JSONB NOT NULL DEFAULT
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS experiment_id TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS variant TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS exploration BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'not_required';
+ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS approval_by TEXT NULL;
+ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS approval_at TIMESTAMPTZ NULL;
 CREATE INDEX IF NOT EXISTS cyan_drafts_due_idx ON cyan_drafts(workspace_id,status,scheduled_at);
+CREATE INDEX IF NOT EXISTS cyan_drafts_approval_idx ON cyan_drafts(workspace_id,approval_status,status);
 CREATE TABLE IF NOT EXISTS cyan_experiments(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,topic TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),winner_draft_id TEXT NULL,winner_score NUMERIC NULL);
 CREATE INDEX IF NOT EXISTS cyan_experiments_workspace_idx ON cyan_experiments(workspace_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS cyan_control(workspace_id TEXT PRIMARY KEY,mode TEXT NOT NULL DEFAULT 'smart',paused BOOLEAN NOT NULL DEFAULT FALSE,timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',heartbeat_at TIMESTAMPTZ NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
