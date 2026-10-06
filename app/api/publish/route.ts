@@ -35,5 +35,5 @@ export async function POST(req:Request){
    }
   }
   return NextResponse.json(result);
- }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Publish API failed",e);return NextResponse.json({error:"Publishing service unavailable"},{status:503})}
+ }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});if(e instanceof Error&&e.message==="FORBIDDEN")return NextResponse.json({error:"Forbidden"},{status:403});console.error("Publish API failed",e);return NextResponse.json({error:"Publishing service unavailable"},{status:503})}
 }
