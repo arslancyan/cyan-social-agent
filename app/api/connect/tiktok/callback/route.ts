@@ -30,7 +30,7 @@ export async function GET(req:NextRequest){
  }catch(e){
   console.error("TikTok OAuth callback failed",e);
   c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");
-  if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});if(e instanceof Error&&e.message==="FORBIDDEN")return NextResponse.json({error:"Forbidden"},{status:403});
   return NextResponse.json({error:"TikTok connection could not be completed."},{status:502});
  }
 }
