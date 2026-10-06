@@ -1,11 +1,12 @@
 import {NextRequest,NextResponse} from "next/server";
-import {requireUser,runAsUser,rateLimit} from "@/lib/auth";
+import {requireUser,runAsUser,rateLimit,requireWorkspaceRole} from "@/lib/auth";
 import {priorityDecision,scoreTrend} from "@/lib/scoring";
 import {reprioritizeSchedule} from "@/lib/store";
 
 export async function POST(req:NextRequest){
  try{
   const user=await requireUser();
+  await runAsUser(user,()=>requireWorkspaceRole(user.id,["owner","admin","editor"]));
   if(!(await rateLimit("priority:"+user.id,30,60)))return NextResponse.json({error:"Priority rate limit reached. Try again shortly."},{status:429});
   const body=await req.json().catch(()=>({}));
   const score=Number(body.score??scoreTrend({
