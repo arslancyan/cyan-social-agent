@@ -1,11 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">CYAN</title><desc id="desc">Electric blue cyan crescent with a four-point gradient star.</desc>
 <defs>
- <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#45F6FF"/><stop offset="38%" stop-color="#159DFF"/><stop offset="68%" stop-color="#1458FF"/><stop offset="100%" stop-color="#061A8F"/></linearGradient>
- <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <linearGradient id="outer" x1="80" y1="80" x2="430" y2="430" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#18E8FF"/><stop offset=".34" stop-color="#08B9F4"/><stop offset=".67" stop-color="#1265FF"/><stop offset="1" stop-color="#3038F5"/>
+  </linearGradient>
+  <linearGradient id="top" x1="120" y1="80" x2="430" y2="250" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#38F5FF"/><stop offset=".52" stop-color="#1699FF"/><stop offset=".82" stop-color="#3847FF"/><stop offset="1" stop-color="#D52CFF"/>
+  </linearGradient>
+  <linearGradient id="bottom" x1="150" y1="420" x2="430" y2="310" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#00E4FF"/><stop offset=".58" stop-color="#087EFF"/><stop offset="1" stop-color="#7B4DFF"/>
+  </linearGradient>
+  <linearGradient id="star" x1="260" y1="250" x2="355" y2="330" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#13F3FF"/><stop offset=".52" stop-color="#1A9DFF"/><stop offset=".82" stop-color="#8A43FF"/><stop offset="1" stop-color="#FF62E8"/>
+  </linearGradient>
+  <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="starGlow" x="-80%" y="-80%" width="260%" height="260%">
+    <feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
 </defs>
-<g fill="none" stroke="url(#g)" stroke-linecap="round" filter="url(#glow)">
- <path d="M456 256a200 200 0 1 1-58.6-141.4" stroke-width="66"/>
- <path d="M366 256a110 110 0 1 1-32.2-77.8" stroke-width="58"/>
+<g filter="url(#softGlow)">
+  <path fill="url(#outer)" d="M448 92C368 39 272 31 188 64C93 101 35 184 34 276C32 377 94 457 187 481C278 505 378 472 438 398C393 425 343 437 294 430C190 415 116 330 122 235C128 145 195 82 281 66C337 56 399 67 448 92Z"/>
+  <path fill="url(#top)" d="M72 248C79 169 128 101 202 69C280 35 365 48 430 91C451 105 462 119 470 135C475 145 467 154 455 153C371 146 292 154 225 185C165 213 116 252 72 306C68 289 68 268 72 248Z"/>
+  <path fill="url(#bottom)" d="M80 343C117 393 171 425 233 432C306 441 378 416 435 373C445 365 454 367 449 380C416 430 365 464 307 477C218 497 127 463 78 396C68 382 67 365 80 343Z"/>
+  <path fill="#061C68" d="M183 136C139 175 113 224 111 279C108 356 158 414 225 438C183 402 157 351 160 296C163 231 201 178 259 146C233 141 207 137 183 136Z" opacity=".9"/>
 </g>
-<circle cx="256" cy="256" r="34" fill="url(#g)" filter="url(#glow)"/>
+<path fill="url(#star)" filter="url(#starGlow)" d="M311 179C319 215 333 229 371 238C333 247 319 261 311 297C303 261 289 247 251 238C289 229 303 215 311 179Z"/>
 </svg>
