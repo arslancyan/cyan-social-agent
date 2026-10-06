@@ -4,7 +4,7 @@ import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/a
 import {Platform} from "@/lib/types";
 import {buildBrainContext,inspectDraft} from "@/lib/agent";
 import {adaptivePlan,generationStrategy,createExperiment,platformAdaptationPlans} from "@/lib/adaptive";
-function cleanDrafts(input:any[]):any[]{const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);return input.filter(x=>x&&allowed.has(x.platform)&&typeof x.content==="string"&&x.content.trim()).slice(0,6).map(x=>({id:x.id||crypto.randomUUID(),platform:x.platform,angle:typeof x.angle==="string"&&x.angle.trim()?x.angle.trim():"Draft",content:x.content.trim().slice(0,10000),status:"review"}));}
+function cleanDrafts(input:any[]):any[]{const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);return input.filter(x=>x&&allowed.has(x.platform)&&typeof x.content==="string"&&x.content.trim()).slice(0,6).map(x=>({id:x.id||crypto.randomUUID(),platform:x.platform,angle:typeof x.angle==="string"&&x.angle.trim()?x.angle.trim():"Draft",content:x.content.trim().slice(0,10000),status:"review",mediaType:x.mediaType==="video"||x.mediaType==="image"?x.mediaType:undefined,mediaUrl:typeof x.mediaUrl==="string"&&/^https?:\/\//i.test(x.mediaUrl)?x.mediaUrl:undefined,exploration:Boolean(x.exploration)}));}
 function parseModelOutput(raw:string){const trimmed=raw.trim().replace(/^\`\`\`(?:json)?/i,"").replace(/\`\`\`$/,"").trim();try{return JSON.parse(trimmed)}catch{}const start=trimmed.indexOf("[");const end=trimmed.lastIndexOf("]");if(start>=0&&end>start){try{return JSON.parse(trimmed.slice(start,end+1))}catch{}}return []}
 export async function POST(req:Request){
  try{
