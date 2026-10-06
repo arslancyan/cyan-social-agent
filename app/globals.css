@@ -10,8 +10,8 @@ button,input,textarea,select{font:inherit}
 .page{max-width:1220px;margin:0 auto;padding:26px 22px 80px;position:relative}
 .top{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:22px;padding:8px 0;position:sticky;top:0;z-index:20;background:linear-gradient(180deg,rgba(2,5,11,.94) 0%,rgba(2,5,11,.76) 75%,transparent 100%);backdrop-filter:blur(14px)}
 .brand{display:flex;gap:12px;align-items:center}
-.mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#ffffff,#cbd8ed);color:#04070d;border:1px solid rgba(255,255,255,.9);box-shadow:0 0 20px rgba(77,137,255,.3),0 0 46px rgba(88,73,210,.14);font-weight:900;font-size:21px;position:relative;overflow:hidden}
-.mark:after{content:"";position:absolute;width:70px;height:20px;top:-16px;left:-25px;transform:rotate(-35deg);background:rgba(255,255,255,.55);filter:blur(8px)}
+.mark{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:radial-gradient(circle at 35% 25%,rgba(65,224,255,.18),rgba(5,25,65,.95) 72%);border:1px solid rgba(58,161,255,.55);box-shadow:0 0 18px rgba(21,139,255,.55),0 0 42px rgba(22,91,255,.28),inset 0 0 18px rgba(53,207,255,.1);position:relative;overflow:hidden}
+.mark:after{content:"";position:absolute;width:70px;height:20px;top:-16px;left:-25px;transform:rotate(-35deg);background:rgba(80,220,255,.32);filter:blur(8px)}\n.mark img{width:100%;height:100%;object-fit:contain;display:block;position:relative;z-index:1}
 .brand strong{font-size:21px;letter-spacing:.13em}
 .brand .muted{font-size:11px;letter-spacing:.04em}
 .top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
