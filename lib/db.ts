@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS cyan_usage(user_id TEXT NOT NULL REFERENCES cyan_user
 CREATE TABLE IF NOT EXISTS cyan_events(id BIGSERIAL PRIMARY KEY,workspace_id TEXT NOT NULL,type TEXT NOT NULL,platform TEXT NULL,draft_id TEXT NULL,external_id TEXT NULL,metadata JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS cyan_events_workspace_idx ON cyan_events(workspace_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS cyan_events_platform_time_idx ON cyan_events(workspace_id,platform,created_at DESC);\nCREATE INDEX IF NOT EXISTS cyan_events_workspace_draft_idx ON cyan_events(workspace_id,draft_id,created_at DESC);
-CREATE TABLE IF NOT EXISTS cyan_subscriptions(user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,provider TEXT NOT NULL DEFAULT 'none',customer_id TEXT NULL,subscription_id TEXT NULL,status TEXT NOT NULL DEFAULT 'inactive',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS cyan_stripe_events(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS cyan_subscriptions(user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,provider TEXT NOT NULL DEFAULT 'none',customer_id TEXT NULL,subscription_id TEXT NULL,status TEXT NOT NULL DEFAULT 'inactive',stripe_event_created_at BIGINT NOT NULL DEFAULT 0,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS cyan_stripe_events(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,event_created_at BIGINT NOT NULL DEFAULT 0,processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_drafts(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,angle TEXT NOT NULL,content TEXT NOT NULL,status TEXT NOT NULL,scheduled_at TIMESTAMPTZ NULL,trend_id TEXT NULL,protected BOOLEAN NOT NULL DEFAULT FALSE,media_url TEXT NULL,media_type TEXT NULL,external_id TEXT NULL,publish_attempts INTEGER NOT NULL DEFAULT 0,publish_started_at TIMESTAMPTZ NULL,features JSONB NOT NULL DEFAULT '{}'::jsonb,experiment_id TEXT NULL,variant TEXT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_url TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_type TEXT NULL;
@@ -59,6 +59,8 @@ CREATE INDEX IF NOT EXISTS cyan_inbox_messages_workspace_time_idx ON cyan_inbox_
 CREATE TABLE IF NOT EXISTS cyan_strategy_decisions(id BIGSERIAL PRIMARY KEY,workspace_id TEXT NOT NULL,trend_id TEXT NULL,platform TEXT NOT NULL,angle TEXT NOT NULL,decision TEXT NOT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,priority INTEGER NOT NULL DEFAULT 0,confidence INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL,metadata JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS cyan_strategy_decisions_workspace_idx ON cyan_strategy_decisions(workspace_id,created_at DESC);
 
+ALTER TABLE cyan_subscriptions ADD COLUMN IF NOT EXISTS stripe_event_created_at BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE cyan_stripe_events ADD COLUMN IF NOT EXISTS event_created_at BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS access_token_enc TEXT NULL;
 ALTER TABLE cyan_connections ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT NULL;
 ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta';
