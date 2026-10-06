@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {cookies} from "next/headers";
-import {requireUser,runAsUser} from "@/lib/auth";
+import {requireUser,runAsUser,requireWorkspaceRole,rateLimit} from "@/lib/auth";
 import {encryptSecret} from "@/lib/crypto";
 import {saveConnection} from "@/lib/store";
 
@@ -9,7 +9,7 @@ async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeou
 export async function GET(req:NextRequest){
  const c=await cookies();
  try{
-  const user=await requireUser();
+  const user=await requireUser();await requireWorkspaceRole(user.id,["owner","admin"]);if(!(await rateLimit("tiktok-oauth-callback:"+user.id,10,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});
   const u=new URL(req.url);
   if(u.searchParams.get("error")){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.redirect(new URL("/?connection_error=TikTok",req.url));}
   const code=u.searchParams.get("code"),state=u.searchParams.get("state"),expected=c.get("cyan_tt_state")?.value,verifier=c.get("cyan_tt_verifier")?.value;
