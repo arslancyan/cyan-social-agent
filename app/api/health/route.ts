@@ -17,7 +17,7 @@ export async function GET(){
    await pool.query("SELECT 1");
    control=await getControl();
    db=true;
-  }catch(e){databaseError=e instanceof Error?e.message.slice(0,160):"database connection failed";}
+  }catch(e){databaseError=e instanceof Error?e.name:"database connection failed";}
  }
  return NextResponse.json({
   name:"CYAN Social Agent",
