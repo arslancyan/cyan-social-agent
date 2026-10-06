@@ -26,6 +26,13 @@ jobs:
             echo "CYAN_APP_URL repository variable is not configured."
             exit 1
           fi
+          health_status="$(curl --silent --show-error --max-time 20 --output /tmp/cyan-health.json --write-out "%{http_code}" "${CYAN_APP_URL%/}/api/health")"
+          echo "CYAN health HTTP status: ${health_status}"
+          cat /tmp/cyan-health.json
+          if [ "${health_status}" != "200" ]; then
+            echo "CYAN runtime health preflight failed."
+            exit 1
+          fi
           oidc_token="$(curl --fail --silent --show-error \
             -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             -H "Accept: application/json; api-version=2.0" \
