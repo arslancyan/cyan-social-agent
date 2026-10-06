@@ -5,6 +5,26 @@ import {requireUser,runAsUser,rateLimit,requireWorkspaceRole} from "@/lib/auth";
 
 const platforms=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);
 
+function isSafeMediaUrl(value:string){
+ try{
+  const u=new URL(value);
+  if(u.protocol!=="https:"||u.username||u.password)return false;
+  const host=u.hostname.toLowerCase().replace(/^\[|\]$/g,"");
+  if(host==="localhost"||host.endsWith(".localhost")||host==="metadata.google.internal"||host==="metadata.google"){
+   return false;
+  }
+  if(host==="127.0.0.1"||host==="0.0.0.0"||host==="::1"||host.startsWith("169.254."))return false;
+  const ipv4=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if(ipv4){
+   const n=ipv4.slice(1).map(Number);
+   if(n.some(x=>x>255))return false;
+   const [a,b]=n;
+   if(a===10||a===127||a===0||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&b===168)return false;
+  }
+  return true;
+ }catch{return false}
+}
+
 export async function POST(req:NextRequest){
  try{
   const u=await requireUser();
@@ -18,7 +38,7 @@ export async function POST(req:NextRequest){
   if(b.scheduledAt&&new Date(b.scheduledAt).getTime()<=Date.now())return NextResponse.json({error:"scheduledAt must be in the future"},{status:400});
   const mediaUrl=typeof b.mediaUrl==="string"?b.mediaUrl.trim():"";
   if(mediaUrl&&mediaUrl.length>2000)return NextResponse.json({error:"mediaUrl is too long"},{status:400});
-  if(mediaUrl){try{new URL(mediaUrl)}catch{return NextResponse.json({error:"mediaUrl must be a valid public URL"},{status:400})}}
+  if(mediaUrl&&!isSafeMediaUrl(mediaUrl))return NextResponse.json({error:"mediaUrl must be a public HTTPS URL"},{status:400});
   const mediaType=b.mediaType==="image"?"image":b.mediaType==="video"?"video":undefined;
   const draft:Draft={id:crypto.randomUUID(),platform:b.platform,angle:typeof b.angle==="string"&&b.angle.trim()?b.angle.trim():"manual",content:b.content.trim(),status:b.scheduledAt?"scheduled":"draft",scheduledAt:b.scheduledAt,protected:Boolean(b.protected),mediaUrl:mediaUrl||undefined,mediaType};
   return NextResponse.json(await runAsUser(u,async()=>({draft:await addManualDraft(draft)})));
