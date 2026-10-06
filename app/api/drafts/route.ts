@@ -46,7 +46,7 @@ export async function PUT(req:Request){
 
 export async function PATCH(req:Request){
  try{
-  const u=await requireUser();
+  const u=await requireUser();await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));
   const b=await req.json().catch(()=>({}));
   if(typeof b.id!=="string"||b.id.length>200||typeof b.status!=="string"||!["draft","review","scheduled"].includes(b.status))return NextResponse.json({error:"Invalid draft update"},{status:400});
   if(b.status==="scheduled"&&(typeof b.scheduledAt!=="string"||Number.isNaN(Date.parse(b.scheduledAt))))return NextResponse.json({error:"Scheduled posts require a valid scheduledAt"},{status:400});
