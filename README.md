@@ -59,3 +59,6 @@ Before enabling the worker, configure the Vercel Production environment with `DA
 The GitHub Actions worker uses GitHub OIDC, so it does not require a long-lived worker secret. Keep the repository variable `CYAN_APP_URL` aligned with the deployed Vercel URL. If `GITHUB_OIDC_AUDIENCE` is set, it must match the same audience.
 
 If the database is missing, `/api/worker/tick` intentionally returns HTTP 503 with `code: "DATABASE_NOT_CONFIGURED"` instead of presenting the infrastructure problem as a generic application failure.
+
+
+<!-- Production redeploy trigger: refresh runtime environment after infrastructure configuration. -->
