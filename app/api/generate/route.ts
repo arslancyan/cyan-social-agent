@@ -31,13 +31,13 @@ export async function POST(req:Request){
     {platform:"X",angle:"Hook",content:"What changed? Here’s the signal worth watching — and why it matters beyond the headline."},
     {platform:"TikTok",angle:"Explainer",content:"30-second script: lead with the surprising fact, explain the context, then end with one useful takeaway."},
     {platform:"Instagram",angle:"Carousel",content:"Slide 1: The story. Slide 2: What happened. Slide 3: Why it matters. Slide 4: What to watch next."}
-   ]);
+   ],platform);
   }else{
    const prompt=["You are CYAN, a responsible social media agent.","Create original platform-native drafts from the supplied topic and verified signal.","Never invent facts, statistics, quotes, events or sources.","Separate verified facts from interpretation.","Avoid guaranteed returns, insider claims, pump language, or pressure to buy.","Return ONLY a JSON array. No markdown fences.","Each item must contain platform, angle, content, and optional mediaType. Generate 4 candidates: 3 should exploit the strongest learned patterns; 1 should deliberately explore an under-tested platform, angle, hook, format or CTA. Each candidate must be genuinely adapted to its platform, not copied across platforms.","Platforms: X, TikTok, Instagram, Facebook.","Requested platform: "+(platform||"all platforms"),"CYAN workflow:",context.workflow,"Platform guidance:",JSON.stringify(context.platforms),"Recent workspace learning signals (use only as optimization hints, never as facts):",JSON.stringify(learning),"Adaptive generation strategy:",JSON.stringify(strategy),"Platform-native adaptation plans:",JSON.stringify(adaptations),"Exploration rule: allocate approximately 75% exploitation and 25% exploration. Use topFeatures as optimization hints, but do not copy prior posts.","Safety:",context.safety,"Topic:",topic,trendContext.trim()].join("\n");
    const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+apiKey},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-6-luna",input:prompt})});
    if(!response.ok){await releaseUsage(user,"generations");return NextResponse.json({error:"AI provider request failed"},{status:502});}
    const data=await response.json();
-   drafts=cleanDrafts(parseModelOutput(String(data.output_text||"")));
+   drafts=cleanDrafts(parseModelOutput(String(data.output_text||"")),platform);
    if(drafts.length===0){await releaseUsage(user,"generations");return NextResponse.json({error:"AI returned no valid drafts. Try a more specific topic."},{status:502});}
   }
   try{
