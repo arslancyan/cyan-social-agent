@@ -65,3 +65,8 @@ ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT
 `);})().catch(err=>{globalThis.__cyanSchemaPromise=undefined;throw err;}); return globalThis.__cyanSchemaPromise;
 }
 export {pool};
+
+CREATE INDEX IF NOT EXISTS cyan_sessions_user_idx ON cyan_sessions(user_id,expires_at);
+CREATE INDEX IF NOT EXISTS cyan_events_workspace_draft_idx ON cyan_events(workspace_id,draft_id,created_at DESC);
+ALTER TABLE cyan_drafts ADD CONSTRAINT cyan_drafts_approval_status_check CHECK (approval_status IN ('not_required','pending','approved','rejected'));
+ALTER TABLE cyan_workspace_members ADD CONSTRAINT cyan_workspace_members_role_check CHECK (role IN ('owner','admin','editor','approver','member','viewer'));
