@@ -34,6 +34,7 @@ const growth=await optimizeGrowth();
 const autonomousIdea=control.mode==="autonomous"?await chooseNextIdea():null;
 const policy=trendResult.top&&control.mode==="autonomous"?await evaluatePolicy(trendResult.top,"autonomous"):null;
 if(policy)await recordPolicyDecision(policy,trendResult.top?.id,autonomousIdea?.platform);
+const autonomousActionAllowed=Boolean(policy&&["schedule","explore"].includes(policy.action));
 let autonomousGeneration:any={generated:0,scheduled:0,skipped:"Autonomous mode is disabled."};
 if(autonomousIdea&&autonomousActionAllowed)try{autonomousGeneration=await autonomousGenerate(user,autonomousIdea);}catch(e){autonomousGeneration={generated:0,scheduled:0,error:e instanceof Error?e.message:"Autonomous generation failed"};await recordWorker(false,"Autonomous generation failed: "+autonomousGeneration.error);}
 const adaptive = control.mode==="autonomous" && autonomousActionAllowed ? await autoScheduleAdaptive(allDrafts.filter(d=>d.status==="draft"||d.status==="review").map(d=>d.id).slice(0,20),"autonomous") : {scheduled:[]};
