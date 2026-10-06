@@ -13,6 +13,7 @@ export async function POST(req:Request){
   const body=await req.json().catch(()=>({}));
   const topic=typeof body.topic==="string"?body.topic.trim():"";
   const trendId=typeof body.trendId==="string"&&body.trendId.length<=200?body.trendId:"";
+  const platform=typeof body.platform==="string"&&["X","TikTok","Instagram","Facebook"].includes(body.platform)?body.platform:"";
   if(!topic||topic.length>4000)return NextResponse.json({error:"Topic is required and must be 1–4000 characters."},{status:400});
   const allowed=await consumeUsage(user,"generations");
   if(!allowed)return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});
