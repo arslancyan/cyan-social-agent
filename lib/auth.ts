@@ -5,7 +5,8 @@ import {AsyncLocalStorage} from "async_hooks";
 import {limits as planLimits,hasWorkspaceRole,Plan,WorkspaceRole} from "./security-policy";
 
 type SessionUser={id:string;email:string;plan:"free"|"creator"|"pro"|"agency"};
-const context=new AsyncLocalStorage<SessionUser>();
+type RequestContext={user:SessionUser;workspaceId:string};
+const context=new AsyncLocalStorage<RequestContext>();
 
 export function hashPassword(password:string){
  const salt=randomBytes(16).toString("hex");
@@ -52,10 +53,17 @@ export async function logout(){
  if(token){await dbReady();await pool.query("DELETE FROM cyan_sessions WHERE token_hash=$1",[hashToken(token)]);}
  c.delete("cyan_session");
 }
-export async function runAsUser<T>(user:SessionUser,fn:()=>Promise<T>){return context.run(user,fn);}
+export async function runAsUser<T>(user:SessionUser,fn:()=>Promise<T>,requestedWorkspace?:string){
+ await dbReady();
+ const cookieWorkspace=(await cookies()).get("cyan_workspace")?.value;
+ const candidate=requestedWorkspace||cookieWorkspace||user.id;
+ const membership=await pool.query("SELECT 1 FROM cyan_workspace_members WHERE workspace_id=$1 AND user_id=$2 LIMIT 1",[candidate,user.id]);
+ const activeWorkspace=membership.rowCount?candidate:user.id;
+ return context.run({user,workspaceId:activeWorkspace},fn);
+}
 export async function workspaceRole(userId:string,workspace?:string){await dbReady();const wid=workspace||userId;const r=await pool.query("SELECT role FROM cyan_workspace_members WHERE workspace_id=$1 AND user_id=$2",[wid,userId]);return r.rows[0]?.role||((wid===userId)?"owner":null);}
 export async function requireWorkspaceRole(userId:string,roles:string[],workspace?:string){const role=await workspaceRole(userId,workspace);if(!role||!hasWorkspaceRole(role as WorkspaceRole,roles as WorkspaceRole[]))throw new Error("FORBIDDEN");return role;}
-export function workspaceId(){const user=context.getStore();return user?.id||process.env.CYAN_WORKSPACE_ID||"local";}
+export function workspaceId(){const ctx=context.getStore();return ctx?.workspaceId||process.env.CYAN_WORKSPACE_ID||"local";}
 export function limits(plan:SessionUser["plan"]){return planLimits(plan);}
 
 export async function consumeUsage(user:SessionUser,type:"generations"|"publishes"){
