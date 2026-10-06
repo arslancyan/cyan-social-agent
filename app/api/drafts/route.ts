@@ -1,11 +1,11 @@
 import {NextResponse} from "next/server";
 import {listDrafts,saveDrafts,updateStatus,updateStatusesAtomic} from "@/lib/store";
 import {buildDrafts} from "@/lib/agent";
-import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
+import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspaceRole} from "@/lib/auth";
 
 export async function GET(){
  try{const u=await requireUser();return NextResponse.json(await runAsUser(u,async()=>({drafts:await listDrafts()})))}
- catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Draft GET failed",e);return NextResponse.json({error:"Draft service unavailable"},{status:503})}
+ catch(e){if(e instanceof Error&&e.message==="FORBIDDEN")return NextResponse.json({error:"Forbidden"},{status:403});if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Draft GET failed",e);return NextResponse.json({error:"Draft service unavailable"},{status:503})}
 }
 
 export async function POST(req:Request){
@@ -15,7 +15,7 @@ export async function POST(req:Request){
   const b=await req.json().catch(()=>({}));
   if(!b.topic||typeof b.topic!=="string"||b.topic.trim().length===0||b.topic.length>4000)return NextResponse.json({error:"Topic is required and must be 1–4000 characters."},{status:400});
   if(!(await consumeUsage(u,"generations")))return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});
-  const drafts=buildDrafts(b.topic.trim());
+  await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));const drafts=buildDrafts(b.topic.trim());
   try{
    const saved=await runAsUser(u,()=>saveDrafts(drafts));
    return NextResponse.json({drafts:saved});
@@ -33,7 +33,7 @@ export async function POST(req:Request){
 
 export async function PUT(req:Request){
  try{
-  const u=await requireUser();const b=await req.json().catch(()=>({}));
+  const u=await requireUser();await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));const b=await req.json().catch(()=>({}));
   const ids=Array.isArray(b.ids)?b.ids.filter((x:any,i:number,a:any[])=>typeof x==="string"&&a.indexOf(x)===i).slice(0,50):[];
   const status=b.status;
   if(!ids.length||!["draft","review","scheduled"].includes(status))return NextResponse.json({error:"ids and a valid status are required"},{status:400});
