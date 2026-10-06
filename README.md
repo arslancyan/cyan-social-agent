@@ -51,3 +51,11 @@ For a production SaaS, the next security layer is user authentication and tenant
 
 The repository includes a Vercel Cron entry for `/api/worker/tick`. Vercel supports cron-triggered Functions; current Vercel documentation notes that minute-level cron precision is available on Pro/Enterprise, while Hobby has lower scheduling precision. For frequent trend checks on a free setup, GitHub Actions provides the current 5-minute worker cadence. Scheduled GitHub Actions can be delayed, so this is not hard real-time. Upgrade the worker infrastructure later if tighter timing is required.
 
+
+### Production runtime checklist
+
+Before enabling the worker, configure the Vercel Production environment with `DATABASE_URL` (or a supported Postgres equivalent). The worker initializes the CYAN schema automatically on first successful tick. `GET /api/health` should return HTTP 200 with `status: "ok"` once the database is reachable.
+
+The GitHub Actions worker uses GitHub OIDC, so it does not require a long-lived worker secret. Keep the repository variable `CYAN_APP_URL` aligned with the deployed Vercel URL. If `GITHUB_OIDC_AUDIENCE` is set, it must match the same audience.
+
+If the database is missing, `/api/worker/tick` intentionally returns HTTP 503 with `code: "DATABASE_NOT_CONFIGURED"` instead of presenting the infrastructure problem as a generic application failure.
