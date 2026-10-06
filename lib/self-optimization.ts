@@ -82,8 +82,9 @@ export async function calibrateLearning():Promise<{updates:number;averageError:n
     const impressions=Math.max(1,num(m.impressions||m.views));
     const interactions=num(m.likes)+num(m.comments)*3+num(m.shares)*4+num(m.clicks)*2;
     const actual=clamp(interactions/impressions*1000);
-    const expected=Number.isFinite(Number(m.expectedOutcome))?clamp(Number(m.expectedOutcome)):clamp(50+Math.min(35,Math.log10(impressions+1)*8));
-    const error=actual-expected;
+    const expected=Number(m.expectedOutcome);
+    if(!Number.isFinite(expected))continue;
+    const error=actual-clamp(expected);
     total+=Math.abs(error);bias+=error;count++;
   }
   const averageError=Number((total/count).toFixed(2)),meanBias=Number((bias/count).toFixed(2));
