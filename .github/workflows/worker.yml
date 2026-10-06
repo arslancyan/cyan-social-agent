@@ -33,12 +33,22 @@ jobs:
             echo "CYAN runtime health preflight failed."
             exit 1
           fi
+          unauth_status="$(curl --silent --show-error --max-time 20 --output /tmp/cyan-unauth.json --write-out "%{http_code}" -X POST "${CYAN_APP_URL%/}/api/worker/tick" -H "Accept: application/json")"
+          echo "CYAN unauthenticated worker HTTP status: ${unauth_status}"
+          cat /tmp/cyan-unauth.json
+          if [ "${unauth_status}" != "401" ]; then
+            echo "CYAN worker authentication preflight failed."
+            exit 1
+          fi
           oidc_token="$(curl --fail --silent --show-error \
             -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             -H "Accept: application/json; api-version=2.0" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${CYAN_APP_URL%/}")"
           token="$(printf '%s' "$oidc_token" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
-          curl --fail-with-body --silent --show-error --max-time 280 \
+          worker_status="$(curl --fail-with-body --silent --show-error --max-time 280 --output /tmp/cyan-worker.json --write-out "%{http_code}" \
             -X POST "${CYAN_APP_URL%/}/api/worker/tick" \
             -H "x-github-oidc-token: ${token}" \
-            -H "Accept: application/json"
+            -H "Accept: application/json")"
+          echo "CYAN authenticated worker HTTP status: ${worker_status}"
+          cat /tmp/cyan-worker.json
+          python -c 'import json,sys; d=json.load(open("/tmp/cyan-worker.json")); assert d.get("ok") is True, "worker response did not report ok=true"'
