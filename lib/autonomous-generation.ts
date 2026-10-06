@@ -34,7 +34,7 @@ function parse(raw:string){
 async function generationGuard(decision:StrategyDecision){
  await dbReady();
  const workspace=(await import("./auth")).workspaceId();
- const recent=await pool.query(`SELECT metadata FROM cyan_events WHERE workspace_id=$1 AND type='autonomous_generation' AND created_at>=NOW()-INTERVAL '6 hours' ORDER BY created_at DESC LIMIT 20`,[workspace]);
+ const recent=await pool.query(`SELECT metadata,created_at FROM cyan_events WHERE workspace_id=$1 AND type='autonomous_generation' AND created_at>=NOW()-INTERVAL '6 hours' ORDER BY created_at DESC LIMIT 20`,[workspace]);
  const failures=recent.rows.filter((r:any)=>Number(r.metadata?.accepted||0)===0).length;
  if(failures>=3)return "Autonomous generation circuit breaker is active after repeated failed cycles.";
  const duplicate=recent.rows.some((r:any)=>{
@@ -42,7 +42,7 @@ async function generationGuard(decision:StrategyDecision){
   return m.trendId===decision.trend.id&&m.platform===decision.platform&&m.angle===decision.angle;
  });
  if(duplicate)return "Duplicate autonomous trend/platform/angle generation is suppressed.";
- const cooldown=recent.rows.some((r:any)=>r.metadata?.accepted===undefined||Number(r.metadata?.accepted||0)>0);
+ const cooldown=recent.rows.some((r:any)=>new Date(r.created_at).getTime()>=Date.now()-60*60*1000);
  if(cooldown)return "Autonomous generation cooldown is active.";
  return null;
 }
