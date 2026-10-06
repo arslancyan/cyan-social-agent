@@ -12,13 +12,13 @@ export async function dbReady(){
  globalThis.__cyanSchemaPromise=(async()=>{await pool.query(`
 CREATE TABLE IF NOT EXISTS cyan_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,plan TEXT NOT NULL DEFAULT 'free',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,expires_at TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE INDEX IF NOT EXISTS cyan_sessions_exp_idx ON cyan_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS cyan_sessions_exp_idx ON cyan_sessions(expires_at);\nCREATE INDEX IF NOT EXISTS cyan_sessions_user_idx ON cyan_sessions(user_id,expires_at);
 CREATE TABLE IF NOT EXISTS cyan_rate_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL DEFAULT 0,reset_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS cyan_rate_limits_reset_idx ON cyan_rate_limits(reset_at);
 CREATE TABLE IF NOT EXISTS cyan_usage(user_id TEXT NOT NULL REFERENCES cyan_users(id) ON DELETE CASCADE,day DATE NOT NULL,generations INTEGER NOT NULL DEFAULT 0,publishes INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,day));
 CREATE TABLE IF NOT EXISTS cyan_events(id BIGSERIAL PRIMARY KEY,workspace_id TEXT NOT NULL,type TEXT NOT NULL,platform TEXT NULL,draft_id TEXT NULL,external_id TEXT NULL,metadata JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS cyan_events_workspace_idx ON cyan_events(workspace_id,created_at DESC);
-CREATE INDEX IF NOT EXISTS cyan_events_platform_time_idx ON cyan_events(workspace_id,platform,created_at DESC);
+CREATE INDEX IF NOT EXISTS cyan_events_platform_time_idx ON cyan_events(workspace_id,platform,created_at DESC);\nCREATE INDEX IF NOT EXISTS cyan_events_workspace_draft_idx ON cyan_events(workspace_id,draft_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS cyan_subscriptions(user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,provider TEXT NOT NULL DEFAULT 'none',customer_id TEXT NULL,subscription_id TEXT NULL,status TEXT NOT NULL DEFAULT 'inactive',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_stripe_events(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_drafts(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,angle TEXT NOT NULL,content TEXT NOT NULL,status TEXT NOT NULL,scheduled_at TIMESTAMPTZ NULL,trend_id TEXT NULL,protected BOOLEAN NOT NULL DEFAULT FALSE,media_url TEXT NULL,media_type TEXT NULL,external_id TEXT NULL,publish_attempts INTEGER NOT NULL DEFAULT 0,publish_started_at TIMESTAMPTZ NULL,features JSONB NOT NULL DEFAULT '{}'::jsonb,experiment_id TEXT NULL,variant TEXT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
@@ -65,8 +65,3 @@ ALTER TABLE cyan_control ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT
 `);})().catch(err=>{globalThis.__cyanSchemaPromise=undefined;throw err;}); return globalThis.__cyanSchemaPromise;
 }
 export {pool};
-
-CREATE INDEX IF NOT EXISTS cyan_sessions_user_idx ON cyan_sessions(user_id,expires_at);
-CREATE INDEX IF NOT EXISTS cyan_events_workspace_draft_idx ON cyan_events(workspace_id,draft_id,created_at DESC);
-ALTER TABLE cyan_drafts ADD CONSTRAINT cyan_drafts_approval_status_check CHECK (approval_status IN ('not_required','pending','approved','rejected'));
-ALTER TABLE cyan_workspace_members ADD CONSTRAINT cyan_workspace_members_role_check CHECK (role IN ('owner','admin','editor','approver','member','viewer'));
