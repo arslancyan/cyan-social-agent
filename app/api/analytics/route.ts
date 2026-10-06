@@ -30,6 +30,7 @@ export async function POST(req:Request){
 export async function GET(){
  try{
   const user=await requireUser();
+  if(!(await rateLimit("analytics-read:"+user.id,120,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});
   return NextResponse.json(await runAsUser(user,async()=>{
    const [events,trendStats,usage,content,features,growth,budget,memory,patterns,sources]=await Promise.all([
     analyticsSummary(),
