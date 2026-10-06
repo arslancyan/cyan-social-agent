@@ -52,6 +52,8 @@ export async function logout(){
  c.delete("cyan_session");
 }
 export async function runAsUser<T>(user:SessionUser,fn:()=>Promise<T>){return context.run(user,fn);}
+export async function workspaceRole(userId:string,workspace?:string){await dbReady();const wid=workspace||userId;const r=await pool.query("SELECT role FROM cyan_workspace_members WHERE workspace_id=$1 AND user_id=$2",[wid,userId]);return r.rows[0]?.role||null;}
+export async function requireWorkspaceRole(userId:string,roles:string[],workspace?:string){const role=await workspaceRole(userId,workspace);if(!role||!roles.includes(role))throw new Error("FORBIDDEN");return role;}
 export function workspaceId(){const user=context.getStore();return user?.id||process.env.CYAN_WORKSPACE_ID||"local";}
 export function limits(plan:SessionUser["plan"]){
  return plan==="free"?{generations:10,publishes:10,accounts:1}:plan==="creator"?{generations:200,publishes:100,accounts:3}:plan==="pro"?{generations:600,publishes:500,accounts:10}:{generations:3000,publishes:3000,accounts:50};
