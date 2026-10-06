@@ -2,14 +2,14 @@ import {NextRequest,NextResponse} from "next/server";
 import {cookies} from "next/headers";
 import {encryptSecret} from "@/lib/crypto";
 import {saveConnection} from "@/lib/store";
-import {requireUser,runAsUser} from "@/lib/auth";
+import {requireUser,runAsUser,requireWorkspaceRole,rateLimit} from "@/lib/auth";
 
 async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeoutMs=10000){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);try{return await fetch(input,{...init,signal:controller.signal});}finally{clearTimeout(timer);}}
 
 export async function GET(req:NextRequest){
  const c=await cookies();
  try{
-  const user=await requireUser();
+  const user=await requireUser();await requireWorkspaceRole(user.id,["owner","admin"]);if(!(await rateLimit("x-oauth-callback:"+user.id,10,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});
   const url=new URL(req.url);
   const error=url.searchParams.get("error");
   if(error){c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");return NextResponse.redirect(new URL("/?connection_error=X",req.url));}
