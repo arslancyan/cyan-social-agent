@@ -14,8 +14,8 @@ export async function POST(req:Request){
   if(!(await rateLimit("drafts:"+u.id,30,60)))return NextResponse.json({error:"Draft rate limit reached. Try again shortly."},{status:429});
   const b=await req.json().catch(()=>({}));
   if(!b.topic||typeof b.topic!=="string"||b.topic.trim().length===0||b.topic.length>4000)return NextResponse.json({error:"Topic is required and must be 1–4000 characters."},{status:400});
-  if(!(await consumeUsage(u,"generations")))return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});
-  await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));const drafts=buildDrafts(b.topic.trim());
+  await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));
+  if(!(await consumeUsage(u,"generations")))return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});const drafts=buildDrafts(b.topic.trim());
   try{
    const saved=await runAsUser(u,()=>saveDrafts(drafts));
    return NextResponse.json({drafts:saved});
