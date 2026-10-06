@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 import {publishDraft} from "@/lib/platforms";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
-import {claimManualPublish,updateStatus} from "@/lib/store";
+import {claimManualPublish,recordEvent,updateStatus} from "@/lib/store";
 
 export async function POST(req:Request){
  try{
@@ -21,7 +21,7 @@ export async function POST(req:Request){
   }else{
    await releaseUsage(user,"publishes");
    if(result.retryable===false){
-    await runAsUser(user,()=>updateStatus(draft.id,"review",undefined,null));
+    await runAsUser(user,()=>updateStatus(draft.id,"review",undefined,null));\n    await runAsUser(user,()=>recordEvent("publish_blocked",draft.id,draft.platform,{reason:result.error||"Non-retryable publish failure",retryable:false,source:"manual_publish"}));
    }else{
     await runAsUser(user,()=>updateStatus(draft.id,"scheduled",new Date(Date.now()+15*60*1000).toISOString(),null));
    }
