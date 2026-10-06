@@ -1,10 +1,11 @@
 import {NextResponse} from "next/server";
-import {requireUser,rateLimit,consumeUsage,releaseUsage} from "@/lib/auth";
+import {requireUser,rateLimit,consumeUsage,releaseUsage,runAsUser,requireWorkspaceRole} from "@/lib/auth";
 import {buildDrafts} from "@/lib/agent";
 
 export async function POST(req:Request){
  try{
   const user=await requireUser();
+  await runAsUser(user,()=>requireWorkspaceRole(user.id,["owner","admin","editor"]));
   if(!(await rateLimit("queue:"+user.id,30,60)))return NextResponse.json({error:"Generation rate limit reached. Try again shortly."},{status:429});
   const body=await req.json().catch(()=>({}));
   const topic=typeof body.topic==="string"?body.topic.trim():"";
