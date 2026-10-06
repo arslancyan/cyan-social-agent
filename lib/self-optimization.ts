@@ -113,6 +113,9 @@ export async function optimizationStatus(){
 export async function portfolioPlan(){
   const adaptations=await platformAdaptationPlans();
   const ranked=[...adaptations].sort((a,b)=>(b.score*b.confidence)-(a.score*a.confidence));
-  const total=ranked.reduce((n,x)=>n+Math.max(1,x.score*(x.confidence/100)),0)||1;
-  return ranked.map(x=>({platform:x.platform,allocation:Math.round(Math.min(60,Math.max(10,x.score*(x.confidence/100)/total*100))),exploration:x.confidence<55}));
+  const raw=ranked.map(x=>({x,weight:Math.max(1,x.score*(x.confidence/100))}));
+  const total=raw.reduce((n,v)=>n+v.weight,0)||1;
+  const capped=raw.map(v=>({...v,share:Math.min(60,Math.max(10,v.weight/total*100))}));
+  const capTotal=capped.reduce((n,v)=>n+v.share,0)||1;
+  return capped.map(v=>({platform:v.x.platform,allocation:Math.round(v.share/capTotal*100),exploration:v.x.confidence<55}));
 }
