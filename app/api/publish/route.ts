@@ -1,11 +1,12 @@
 import {NextResponse} from "next/server";
 import {publishDraft} from "@/lib/platforms";
-import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
+import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspaceRole} from "@/lib/auth";
 import {claimManualPublish,recordEvent,updateStatus} from "@/lib/store";
 
 export async function POST(req:Request){
  try{
   const user=await requireUser();
+  await runAsUser(user,()=>requireWorkspaceRole(user.id,["owner","admin","editor"]));
   if(!(await rateLimit("publish:"+user.id,30,60)))return NextResponse.json({error:"Publishing rate limit reached. Try again shortly."},{status:429});
   const b=await req.json().catch(()=>({}));
   if(!b.draft||typeof b.draft!=="object"||typeof b.draft.id!=="string"||b.draft.id.length>200)return NextResponse.json({error:"A valid draft id is required"},{status:400});
