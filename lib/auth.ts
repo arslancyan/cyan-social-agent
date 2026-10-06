@@ -30,6 +30,7 @@ export async function createSession(user:SessionUser){
  await pool.query("INSERT INTO cyan_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 days')",[hashToken(token),user.id]);
  const c=await cookies();
  c.set("cyan_session",token,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",maxAge:60*60*24*30,path:"/"});
+ c.set("cyan_workspace",user.id,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",maxAge:60*60*24*30,path:"/"});
  return user;
 }
 export async function currentUser():Promise<SessionUser|null>{
@@ -52,6 +53,7 @@ export async function logout(){
  const c=await cookies(),token=c.get("cyan_session")?.value;
  if(token){await dbReady();await pool.query("DELETE FROM cyan_sessions WHERE token_hash=$1",[hashToken(token)]);}
  c.delete("cyan_session");
+ c.delete("cyan_workspace");
 }
 export async function runAsUser<T>(user:SessionUser,fn:()=>Promise<T>,requestedWorkspace?:string){
  await dbReady();
