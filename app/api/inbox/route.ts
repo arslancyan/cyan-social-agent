@@ -28,3 +28,4 @@ export async function PATCH(req:Request){
   }));
  }catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});if(e instanceof Error&&e.message==="Inbox thread not found")return NextResponse.json({error:e.message},{status:404});console.error("Inbox PATCH failed",e);return NextResponse.json({error:"Inbox unavailable"},{status:503});}
 }
+
