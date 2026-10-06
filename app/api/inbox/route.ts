@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {requireUser,runAsUser,rateLimit} from "@/lib/auth";
+import {requireUser,runAsUser,rateLimit,requireWorkspaceRole} from "@/lib/auth";
 import {dbReady,pool} from "@/lib/db";
 export const dynamic="force-dynamic";
 export async function GET(req:Request){
