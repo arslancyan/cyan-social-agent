@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import {saveDrafts,latestTrends,learningSignals,recordEvent,contentFatigue} from "@/lib/store";
-import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
+import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspaceRole} from "@/lib/auth";
 import {Platform} from "@/lib/types";
 import {buildBrainContext,inspectDraft} from "@/lib/agent";
 import {adaptivePlan,generationStrategy,createExperiment,platformAdaptationPlans} from "@/lib/adaptive";
@@ -9,6 +9,7 @@ function parseModelOutput(raw:string){const trimmed=raw.trim().replace(/^\`\`\`(
 export async function POST(req:Request){
  try{
   const user=await requireUser();
+  await runAsUser(user,()=>requireWorkspaceRole(user.id,["owner","admin","editor"]));
   if(!(await rateLimit("generate:"+user.id,30,60)))return NextResponse.json({error:"Generation rate limit reached. Try again shortly."},{status:429});
   const body=await req.json().catch(()=>({}));
   const topic=typeof body.topic==="string"?body.topic.trim():"";
