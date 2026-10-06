@@ -1,0 +1,15 @@
+import {NextResponse} from "next/server";
+import {randomBytes} from "crypto";
+import {requireUser,runAsUser,rateLimit} from "@/lib/auth";
+import {dbReady,pool} from "@/lib/db";
+export const dynamic="force-dynamic";
+async function ensure(user:any){await pool.query("INSERT INTO cyan_workspaces(id,owner_user_id,name) VALUES($1,$1,$2) ON CONFLICT(id) DO NOTHING",[user.id,"CYAN Workspace"]);await pool.query("INSERT INTO cyan_workspace_members(workspace_id,user_id,role) VALUES($1,$1,'owner') ON CONFLICT(workspace_id,user_id) DO UPDATE SET role='owner'",[user.id]);}
+export async function GET(){
+ try{const user=await requireUser();return NextResponse.json(await runAsUser(user,async()=>{await dbReady();await ensure(user);const r=await pool.query("SELECT m.user_id,u.email,u.plan,m.role,m.created_at FROM cyan_workspace_members m JOIN cyan_users u ON u.id=m.user_id WHERE m.workspace_id=$1 ORDER BY m.created_at",[user.id]);return{workspace:{id:user.id,name:"CYAN Workspace"},members:r.rows};}));}
+ catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});return NextResponse.json({error:"Workspace unavailable"},{status:503});}
+}
+export async function POST(req:Request){
+ try{const user=await requireUser();if(!(await rateLimit("workspace-invite:"+user.id,20,3600)))return NextResponse.json({error:"Invite limit reached."},{status:429});const body=await req.json().catch(()=>({}));const email=typeof body.email==="string"?body.email.trim().toLowerCase():"";const role=typeof body.role==="string"?body.role:"member";if(!email||!["admin","editor","member","viewer"].includes(role))return NextResponse.json({error:"Invalid member invite"},{status:400});
+ return NextResponse.json(await runAsUser(user,async()=>{await dbReady();await ensure(user);const found=await pool.query("SELECT id,email,plan FROM cyan_users WHERE email=$1",[email]);if(!found.rows[0])return{invited:false,reason:"User must create a CYAN account before joining a workspace."};await pool.query("INSERT INTO cyan_workspace_members(workspace_id,user_id,role) VALUES($1,$2,$3) ON CONFLICT(workspace_id,user_id) DO UPDATE SET role=EXCLUDED.role",[user.id,found.rows[0].id,role]);return{invited:true,email,role};}));}
+ catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});return NextResponse.json({error:"Workspace unavailable"},{status:503});}
+}
