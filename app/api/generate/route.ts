@@ -60,6 +60,7 @@ export async function POST(req:Request){
  }catch(e){
   const message=e instanceof Error?e.message:"Generation failed";
   if(message==="UNAUTHENTICATED")return NextResponse.json({error:"Please sign in again."},{status:401});
+  if(message==="FORBIDDEN")return NextResponse.json({error:"Forbidden"},{status:403});
   console.error("Generation failed",e);
   return NextResponse.json({error:"Generation service is temporarily unavailable."},{status:503});
  }
