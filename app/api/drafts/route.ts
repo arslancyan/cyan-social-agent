@@ -35,7 +35,7 @@ export async function POST(req:Request){
 export async function PUT(req:Request){
  try{
   const u=await requireUser();const b=await req.json().catch(()=>({}));
-  const ids=Array.isArray(b.ids)?b.ids.filter((x:any)=>typeof x==="string").slice(0,50):[];
+  const ids=Array.isArray(b.ids)?[...new Set(b.ids.filter((x:any)=>typeof x==="string"))].slice(0,50):[];
   const status=b.status;
   if(!ids.length||!["draft","review","scheduled"].includes(status))return NextResponse.json({error:"ids and a valid status are required"},{status:400});
   if(status==="scheduled"&&(typeof b.scheduledAt!=="string"||Number.isNaN(Date.parse(b.scheduledAt))||new Date(b.scheduledAt).getTime()<=Date.now()))return NextResponse.json({error:"scheduledAt must be a valid future time"},{status:400});
