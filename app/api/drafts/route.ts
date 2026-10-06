@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {listDrafts,saveDrafts,updateStatus} from "@/lib/store";
+import {listDrafts,saveDrafts,updateStatus,updateStatusesAtomic} from "@/lib/store";
 import {buildDrafts} from "@/lib/agent";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser} from "@/lib/auth";
 
@@ -39,7 +39,7 @@ export async function PUT(req:Request){
   if(!ids.length||!["draft","review","scheduled"].includes(status))return NextResponse.json({error:"ids and a valid status are required"},{status:400});
   if(status==="scheduled"&&(typeof b.scheduledAt!=="string"||Number.isNaN(Date.parse(b.scheduledAt))||new Date(b.scheduledAt).getTime()<=Date.now()))return NextResponse.json({error:"scheduledAt must be a valid future time"},{status:400});
   const interval=status==="scheduled"?(typeof b.intervalMinutes==="number"?Math.max(0,Math.min(1440,Math.floor(b.intervalMinutes))):0):0;
-  const result=await runAsUser(u,async()=>{const updated:any[]=[];for(let i=0;i<ids.length;i++){const scheduledAt=status==="scheduled"&&interval?new Date(new Date(b.scheduledAt).getTime()+i*interval*60000).toISOString():b.scheduledAt;const d=await updateStatus(ids[i],status,scheduledAt);if(d)updated.push(d)}return updated});
+  const result=await runAsUser(u,()=>updateStatusesAtomic(ids,status,(i)=>status==="scheduled"&&interval?new Date(new Date(b.scheduledAt).getTime()+i*interval*60000).toISOString():b.scheduledAt));
   return NextResponse.json({updated:result,count:result.length});
  }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Draft bulk update failed",e);return NextResponse.json({error:"Draft service unavailable"},{status:503})}
 }
