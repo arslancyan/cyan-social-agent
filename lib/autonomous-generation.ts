@@ -31,15 +31,25 @@ function parse(raw:string){
  return [];
 }
 
-async function cooldown(){
+async function generationGuard(decision:StrategyDecision){
  await dbReady();
- const r=await pool.query("SELECT 1 FROM cyan_events WHERE workspace_id=$1 AND type='autonomous_generation' AND created_at>=NOW()-INTERVAL '1 hour' LIMIT 1",[(await import("./auth")).workspaceId()]);
- return Boolean(r.rowCount);
+ const workspace=(await import("./auth")).workspaceId();
+ const recent=await pool.query(`SELECT metadata FROM cyan_events WHERE workspace_id=$1 AND type='autonomous_generation' AND created_at>=NOW()-INTERVAL '6 hours' ORDER BY created_at DESC LIMIT 20`,[workspace]);
+ const failures=recent.rows.filter((r:any)=>Number(r.metadata?.accepted||0)===0).length;
+ if(failures>=3)return "Autonomous generation circuit breaker is active after repeated failed cycles.";
+ const duplicate=recent.rows.some((r:any)=>{
+  const m=r.metadata||{};
+  return m.trendId===decision.trend.id&&m.platform===decision.platform&&m.angle===decision.angle;
+ });
+ if(duplicate)return "Duplicate autonomous trend/platform/angle generation is suppressed.";
+ const cooldown=recent.rows.some((r:any)=>r.metadata?.accepted===undefined||Number(r.metadata?.accepted||0)>0);
+ if(cooldown)return "Autonomous generation cooldown is active.";
+ return null;
 }
 
 export async function autonomousGenerate(user:any,decision:StrategyDecision){
  if(decision.priority<70||!decision.trend.sourceUrl)return {generated:0,scheduled:0,skipped:"Trend is below the autonomous threshold or has no source URL."};
- if(await cooldown())return {generated:0,scheduled:0,skipped:"Autonomous generation cooldown is active."};
+ const guard=await generationGuard(decision); if(guard)return {generated:0,scheduled:0,skipped:guard};
  const capacity=await pool.query("SELECT COUNT(*)::int count FROM cyan_drafts WHERE workspace_id=$1 AND status IN ('review','scheduled','publishing')",[await import("./auth").then(x=>x.workspaceId())]);
  if(Number(capacity.rows[0]?.count||0)>=50)return {generated:0,scheduled:0,skipped:"Autonomous queue capacity guard is active."};
  const allowed=await consumeUsage(user,"generations");
@@ -69,10 +79,11 @@ export async function autonomousGenerate(user:any,decision:StrategyDecision){
   const explorationIds=new Set(fresh.filter((d:any)=>d.exploration).map(d=>d.id));
   const calendar=await allocateAutonomousCalendar(fresh,explorationIds);
   const scheduled=calendar.scheduled;
-  await recordEvent("autonomous_generation",{metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,draftCount:fresh.length,scheduledCount:scheduled.length,experimentId:experiment?.id||null,priority:decision.priority,exploration:decision.exploration,allocation:calendar.allocation}});
+  await recordEvent("autonomous_generation",{platform:decision.platform,metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,angle:decision.angle,draftCount:fresh.length,accepted:fresh.length,scheduledCount:scheduled.length,experimentId:experiment?.id||null,priority:decision.priority,exploration:decision.exploration,allocation:calendar.allocation}});
   return{generated:fresh.length,scheduled:scheduled.length,scheduledDrafts:scheduled,allocation:calendar.allocation,experiment};
  }catch(e){
   await releaseUsage(user,"generations");
+  try{await recordEvent("autonomous_generation",{platform:decision.platform,metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,angle:decision.angle,accepted:0,reason:e instanceof Error?e.message:"unknown_error"}})}catch{}
   throw e;
  }
 }
