@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 import {analyticsSummary} from "@/lib/store";
 import {dbReady,pool} from "@/lib/db";
-import {requireUser,runAsUser,rateLimit} from "@/lib/auth";
+import {requireUser,runAsUser,rateLimit,workspaceId} from "@/lib/auth";
 import {contentIntelligenceSummary} from "@/lib/store";
 import {featurePerformanceScores} from "@/lib/adaptive";
 import {growthStatus} from "@/lib/growth-optimizer";
@@ -23,7 +23,7 @@ export async function POST(req:Request){
   const safeMetadata={...metadata};
   for(const k of metricKeys){if(k in safeMetadata){const n=Number((safeMetadata as any)[k]);if(!Number.isFinite(n)||n<0||n>10000000000)delete (safeMetadata as any)[k];else (safeMetadata as any)[k]=Math.floor(n);}}
   if(JSON.stringify(metadata).length>4000)return NextResponse.json({error:"Feedback metadata is too large."},{status:400});
-  return NextResponse.json(await runAsUser(user,async()=>{await dbReady();await pool.query("INSERT INTO cyan_events(workspace_id,type,platform,draft_id,metadata) VALUES($1,$2,$3,$4,$5)",[user.id,type,platform||null,draftId||null,JSON.stringify(safeMetadata)]);return {ok:true};}));
+  return NextResponse.json(await runAsUser(user,async()=>{await dbReady();await pool.query("INSERT INTO cyan_events(workspace_id,type,platform,draft_id,metadata) VALUES($1,$2,$3,$4,$5)",[workspaceId(),type,platform||null,draftId||null,JSON.stringify(safeMetadata)]);return {ok:true};}));
  }catch(e){if(e instanceof Error&&e.message==="UNAUTHENTICATED")return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Analytics feedback failed",e);return NextResponse.json({error:"Analytics unavailable"},{status:503});}
 }
 
@@ -34,7 +34,7 @@ export async function GET(){
   return NextResponse.json(await runAsUser(user,async()=>{
    const [events,trendStats,usage,content,features,growth,budget,memory,patterns,sources]=await Promise.all([
     analyticsSummary(),
-    pool.query("SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE score>=85)::int AS high, COALESCE(ROUND(AVG(score)),0)::int AS avg FROM cyan_trends WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days'",[user.id]),
+    pool.query("SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE score>=85)::int AS high, COALESCE(ROUND(AVG(score)),0)::int AS avg FROM cyan_trends WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '30 days'",[workspaceId()]),
     pool.query("SELECT COALESCE(SUM(generations),0)::int AS generations,COALESCE(SUM(publishes),0)::int AS publishes FROM cyan_usage WHERE user_id=$1 AND day>=CURRENT_DATE-INTERVAL '29 days'",[user.id]),
     contentIntelligenceSummary(),featurePerformanceScores(),growthStatus(),explorationBudget(),patternHealth(),topPatterns(15),performanceSources()
    ]);
