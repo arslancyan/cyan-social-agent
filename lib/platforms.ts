@@ -105,9 +105,10 @@ async function publishInstagram(draft:Draft):Promise<PublishResult>{
  if(!draft.mediaUrl)return{platform:"Instagram",ok:false,retryable:false,message:"Instagram publishing requires a public media URL."};
  try{
   const token=await decryptSecret(connection.access_token_enc);
-  const me=await metaJson("/me?fields=id,username",token);
-  if(!me.ok||!me.data?.id)return{platform:"Instagram",ok:false,retryable:false,message:me.message||"Instagram account could not be resolved."};
-  const igId=String(me.data.id);
+  const label=String(connection.account_label||"");
+  const match=/^ig:([^:]+):/.exec(label);
+  const igId=match?.[1]||"";
+  if(!igId)return{platform:"Instagram",ok:false,retryable:false,message:"Instagram account metadata is missing. Reconnect Instagram."};
   if(draft.externalId){
    const status=await metaJson("/"+encodeURIComponent(draft.externalId)+"?fields=status_code",token);
    if(status.ok&&String(status.data?.status_code||"")==="FINISHED")return{platform:"Instagram",ok:true,message:"Published through the official Instagram Graph API.",externalId:draft.externalId};
