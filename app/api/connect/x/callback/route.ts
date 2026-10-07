@@ -9,14 +9,14 @@ async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeou
 export async function GET(req:NextRequest){
  const c=await cookies();
  try{
-  const user=await requireUser();await requireWorkspaceRole(user.id,["owner","admin"]);if(!(await rateLimit("x-oauth-callback:"+user.id,10,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});
+  const user=await requireUser();if(!(await rateLimit("x-oauth-callback:"+user.id,10,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});
   const url=new URL(req.url);
   const error=url.searchParams.get("error");
   if(error){c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");c.delete("cyan_x_oauth_workspace");return NextResponse.redirect(new URL("/?connection_error=X",req.url));}
   const code=url.searchParams.get("code"),state=url.searchParams.get("state");
   const expected=c.get("cyan_x_oauth_state")?.value,verifier=c.get("cyan_x_pkce")?.value,oauthWorkspace=c.get("cyan_x_oauth_workspace")?.value;
   if(!code||!state||!expected||state!==expected||!verifier||!oauthWorkspace){c.delete("cyan_x_oauth_state");c.delete("cyan_x_pkce");c.delete("cyan_x_oauth_workspace");return NextResponse.json({error:"Invalid OAuth state or missing code"},{status:400,headers:{"Cache-Control":"no-store"}});}
-  const clientId=process.env.X_CLIENT_ID,redirect=process.env.X_REDIRECT_URI,secret=process.env.X_CLIENT_SECRET;
+  await runAsUser(user,async()=>{await requireWorkspaceRole(user.id,["owner","admin"],oauthWorkspace);}); const clientId=process.env.X_CLIENT_ID,redirect=process.env.X_REDIRECT_URI,secret=process.env.X_CLIENT_SECRET;
   if(!clientId||!redirect)return NextResponse.json({error:"X OAuth is not configured"},{status:503,headers:{"Cache-Control":"no-store"}});
   const body=new URLSearchParams({code,grant_type:"authorization_code",redirect_uri:redirect,code_verifier:verifier});
   const headers:Record<string,string>={"content-type":"application/x-www-form-urlencoded"};
