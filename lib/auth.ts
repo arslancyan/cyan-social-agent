@@ -91,3 +91,18 @@ export async function listAgentUsers(){
  const r=await pool.query("SELECT id,email,plan FROM cyan_users ORDER BY created_at ASC");
  return r.rows as SessionUser[];
 }
+
+export type AgentWorkspace={id:string;ownerUser:SessionUser;name:string};
+
+export async function listAgentWorkspaces():Promise<AgentWorkspace[]>{
+ await dbReady();
+ const r=await pool.query(`SELECT w.id,w.name,u.id AS owner_id,u.email AS owner_email,u.plan AS owner_plan
+   FROM cyan_workspaces w
+   JOIN cyan_users u ON u.id=w.owner_user_id
+   ORDER BY w.created_at ASC`);
+ return r.rows.map((row:any)=>({
+   id:String(row.id),
+   name:String(row.name),
+   ownerUser:{id:String(row.owner_id),email:String(row.owner_email),plan:String(row.owner_plan) as SessionUser["plan"]}
+ }));
+}
