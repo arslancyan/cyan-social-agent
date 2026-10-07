@@ -21,7 +21,7 @@ export async function GET(req:NextRequest){
   const page=Array.isArray(pages.data)?pages.data.find((p:any)=>p?.access_token):null;
   if(!page)throw new Error("No Facebook Page was returned. Connect a Facebook Page with publishing permission.");
   const pageToken=String(page.access_token),pageId=String(page.id),pageName=String(page.name||"Facebook Page");
-  await runAsUser(user,()=>saveConnection("Facebook",await encryptSecret(pageToken),"",pageName),oauthWorkspace);
+  const encryptedPageToken=await encryptSecret(pageToken);\n  await runAsUser(user,()=>saveConnection("Facebook",encryptedPageToken,"",pageName),oauthWorkspace);
   const ig=page.instagram_business_account;
   if(ig?.id){
    const igLabel=ig.username?"@"+String(ig.username):"Instagram "+String(ig.id);
