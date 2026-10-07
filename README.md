@@ -25,7 +25,7 @@ Social publishing is gated behind official platform APIs and user authorization.
 ## Cloud worker
 `vercel.json` defines a daily fallback worker tick at `/api/worker/tick` for Vercel Hobby. A free GitHub Actions worker also calls the same endpoint every 5 minutes. The dashboard controls the persistent `cyan_control` state; PostgreSQL stores drafts, trends and worker runs. Set `DATABASE_URL` and either `CRON_SECRET` or `CYAN_WORKER_SECRET` before production use. For the GitHub Actions worker, configure repository variable `CYAN_APP_URL` and repository secret `CYAN_WORKER_SECRET`; the latter must match the Vercel secret.
 
-When `TREND_SOURCE_URL` is configured, the worker expects JSON shaped like `{ "trends": [{ "id", "title", "summary", "views", "velocity", "engagement", "freshness", "relevance", "sourceUrl" }] }`, scores each signal, stores it, and may reprioritize flexible scheduled posts when the viral threshold is reached. The actual social publishing adapters still require official OAuth/API connections. Higgsfield video generation requires server-only `HF_API_KEY` plus the configured provider gateway (`HF_VIDEO_WEBHOOK_URL` and status URL); CYAN never exposes that credential to the browser. Studio users can generate a video from a TikTok/Instagram draft, while autonomous mode uses a high-priority cost/quality gate.
+When `TREND_SOURCE_URL` is configured, the worker expects JSON shaped like `{ "trends": [{ "id", "title", "summary", "views", "velocity", "engagement", "freshness", "relevance", "sourceUrl" }] }`, scores each signal, stores it, and may reprioritize flexible scheduled posts when the viral threshold is reached. The actual social publishing adapters require official OAuth/API connections. X and TikTok are already implemented; Instagram and Facebook now use the Meta Graph API through the Meta OAuth flow. Video posts require a publicly reachable media URL, so the Higgsfield output must be accessible to the platform APIs. Higgsfield video generation requires server-only `HF_API_KEY` plus the configured provider gateway (`HF_VIDEO_WEBHOOK_URL` and status URL); CYAN never exposes that credential to the browser. Studio users can generate a video from a TikTok/Instagram draft, while autonomous mode uses a high-priority cost/quality gate.
 
 ## Local development
 ```bash
@@ -33,7 +33,7 @@ npm install
 npm run dev
 ```
 
-Required environment variables are documented in `.env.example`.
+Required environment variables are documented in `.env.example`. For Meta publishing, configure `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`, and `META_GRAPH_VERSION`, then register the callback path `/api/connect/meta/callback` in the Meta app. One Meta authorization discovers a Facebook Page and its linked Instagram Business/Creator account; CYAN stores the Page token for Facebook and the linked account metadata for Instagram. Meta permissions/app review requirements are controlled by Meta and must be satisfied before production publishing.
 
 
 ## Social connections
