@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {dbReady,pool} from "@/lib/db";
 import {getControl} from "@/lib/store";
+import {higgsfieldConfigured} from "@/lib/higgsfield";
 
 export const dynamic="force-dynamic";
 
