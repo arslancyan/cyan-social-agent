@@ -111,8 +111,13 @@ async function publishInstagram(draft:Draft):Promise<PublishResult>{
   if(!igId)return{platform:"Instagram",ok:false,retryable:false,message:"Instagram account metadata is missing. Reconnect Instagram."};
   if(draft.externalId){
    const status=await metaJson("/"+encodeURIComponent(draft.externalId)+"?fields=status_code",token);
-   if(status.ok&&String(status.data?.status_code||"")==="FINISHED")return{platform:"Instagram",ok:true,message:"Published through the official Instagram Graph API.",externalId:draft.externalId};
-   if(status.ok&&["ERROR","EXPIRED"].includes(String(status.data?.status_code||"")))return{platform:"Instagram",ok:false,retryable:false,message:"Instagram media container failed."};
+   const code=String(status.data?.status_code||"");
+   if(status.ok&&code==="FINISHED"){
+    const published=await metaJson("/"+igId+"/media_publish",token,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({creation_id:draft.externalId}).toString()});
+    if(!published.ok||!published.data?.id)return{platform:"Instagram",ok:false,message:published.message||"Instagram publish failed after container processing."};
+    return{platform:"Instagram",ok:true,message:"Published through the official Instagram Graph API.",externalId:String(published.data.id)};
+   }
+   if(status.ok&&["ERROR","EXPIRED"].includes(code))return{platform:"Instagram",ok:false,retryable:false,message:"Instagram media container failed."};
    return{platform:"Instagram",ok:false,pending:true,message:"Instagram media container is still processing.",externalId:draft.externalId};
   }
   const isVideo=draft.mediaType==="video";
