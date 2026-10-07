@@ -35,5 +35,6 @@ export async function GET(){
   databaseConfigured:Boolean(databaseSource),
   databaseSource,
   databaseError,
+  integrations:{higgsfield:Boolean(higgsfieldConfigured()),x:Boolean(process.env.X_CLIENT_ID&&process.env.X_REDIRECT_URI),tiktok:Boolean(process.env.TIKTOK_CLIENT_KEY&&process.env.TIKTOK_REDIRECT_URI),meta:Boolean(process.env.META_APP_ID&&process.env.META_APP_SECRET&&process.env.META_REDIRECT_URI)},
  },{status:db?200:503});
 }
