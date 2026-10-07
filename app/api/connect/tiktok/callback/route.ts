@@ -11,9 +11,9 @@ export async function GET(req:NextRequest){
  try{
   const user=await requireUser();await requireWorkspaceRole(user.id,["owner","admin"]);if(!(await rateLimit("tiktok-oauth-callback:"+user.id,10,60)))return NextResponse.json({error:"Rate limit reached."},{status:429});
   const u=new URL(req.url);
-  if(u.searchParams.get("error")){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.redirect(new URL("/?connection_error=TikTok",req.url));}
+  if(u.searchParams.get("error")){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");c.delete("cyan_tt_oauth_workspace");return NextResponse.redirect(new URL("/?connection_error=TikTok",req.url));}
   const code=u.searchParams.get("code"),state=u.searchParams.get("state"),expected=c.get("cyan_tt_state")?.value,verifier=c.get("cyan_tt_verifier")?.value;
-  if(!code||!state||state!==expected||!verifier){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400,headers:{"Cache-Control":"no-store"}});}
+  if(!code||!state||state!==expected||!verifier||!oauthWorkspace){c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");c.delete("cyan_tt_oauth_workspace");return NextResponse.json({error:"Invalid TikTok OAuth state."},{status:400,headers:{"Cache-Control":"no-store"}});}
   const key=process.env.TIKTOK_CLIENT_KEY,secret=process.env.TIKTOK_CLIENT_SECRET,redirect=process.env.TIKTOK_REDIRECT_URI;
   if(!key||!secret||!redirect)return NextResponse.json({error:"TikTok OAuth is not configured."},{status:503,headers:{"Cache-Control":"no-store"}});
   const body=new URLSearchParams();body.set("client_key",key);body.set("client_secret",secret);body.set("code",code!);body.set("grant_type","authorization_code");body.set("redirect_uri",redirect);body.set("code_verifier",verifier!);
@@ -24,7 +24,7 @@ export async function GET(req:NextRequest){
   let label:string|undefined;
   const me=await fetchWithTimeout("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name",{headers:{authorization:"Bearer "+token.access_token}});
   if(me.ok){const d=await me.json();label=d.data?.user?.display_name||d.data?.display_name||undefined;}
-  const accessToken=await encryptSecret(token.access_token); const refreshToken=token.refresh_token?await encryptSecret(token.refresh_token):""; await runAsUser(user,()=>saveConnection("TikTok",accessToken,refreshToken,label));
+  const accessToken=await encryptSecret(token.access_token); const refreshToken=token.refresh_token?await encryptSecret(token.refresh_token):""; await runAsUser(user,()=>saveConnection("TikTok",accessToken,refreshToken,label),oauthWorkspace);
   c.delete("cyan_tt_state");c.delete("cyan_tt_verifier");
   return NextResponse.redirect(new URL("/?connected=TikTok",req.url));
  }catch(e){
