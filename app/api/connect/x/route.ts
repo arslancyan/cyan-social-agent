@@ -16,6 +16,7 @@ export async function GET(){
  const c=await cookies();
  c.set("cyan_x_oauth_state",state,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",maxAge:600,path:"/"});
  c.set("cyan_x_pkce",verifier,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",maxAge:600,path:"/"});
+ c.set("cyan_x_oauth_workspace",oauthWorkspace,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",maxAge:600,path:"/"});
  const params=new URLSearchParams({response_type:"code",client_id:clientId,redirect_uri:redirect,scope:"tweet.read tweet.write users.read offline.access",state,code_challenge:challenge,code_challenge_method:"S256"});
  return NextResponse.redirect("https://twitter.com/i/oauth2/authorize?"+params.toString());
 }
