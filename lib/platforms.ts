@@ -4,6 +4,14 @@ import {getConnectionSecret,updateConnectionTokens} from "./store";
 
 export interface PublishResult { platform:Platform; ok:boolean; message:string; externalId?:string; pending?:boolean; retryable?:boolean; }
 
+function metaVersion(){return process.env.META_GRAPH_VERSION||"v23.0";}
+async function metaJson(path:string,token:string,init:RequestInit={}){
+ const url=path.startsWith("http")?path:"https://graph.facebook.com/"+metaVersion()+path;
+ const response=await fetchWithTimeout(url,{...init,headers:{...(init.headers||{}),authorization:"Bearer "+token}});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data?.error)return {ok:false,data,message:data?.error?.message||"Meta Graph API rejected the request."};
+ return {ok:true,data};
+}
 async function fetchWithTimeout(input:RequestInfo|URL,init:RequestInit={},timeoutMs=15000){
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -90,8 +98,61 @@ async function publishTikTok(draft:Draft):Promise<PublishResult>{
   return{platform:"TikTok",ok:false,pending:true,message:"TikTok accepted the publish request; status will be checked by the cloud worker.",externalId:publishId};
  }catch(e){return{platform:"TikTok",ok:false,message:e instanceof Error?e.message:"TikTok publishing failed."};}
 }
+
+async function publishInstagram(draft:Draft):Promise<PublishResult>{
+ const connection=await getConnectionSecret("Instagram");
+ if(!connection?.access_token_enc)return{platform:"Instagram",ok:false,retryable:false,message:"Instagram is not connected."};
+ if(!draft.mediaUrl)return{platform:"Instagram",ok:false,retryable:false,message:"Instagram publishing requires a public media URL."};
+ try{
+  const token=await decryptSecret(connection.access_token_enc);
+  const me=await metaJson("/me?fields=id,username",token);
+  if(!me.ok||!me.data?.id)return{platform:"Instagram",ok:false,retryable:false,message:me.message||"Instagram account could not be resolved."};
+  const igId=String(me.data.id);
+  if(draft.externalId){
+   const status=await metaJson("/"+encodeURIComponent(draft.externalId)+"?fields=status_code",token);
+   if(status.ok&&String(status.data?.status_code||"")==="FINISHED")return{platform:"Instagram",ok:true,message:"Published through the official Instagram Graph API.",externalId:draft.externalId};
+   if(status.ok&&["ERROR","EXPIRED"].includes(String(status.data?.status_code||"")))return{platform:"Instagram",ok:false,retryable:false,message:"Instagram media container failed."};
+   return{platform:"Instagram",ok:false,pending:true,message:"Instagram media container is still processing.",externalId:draft.externalId};
+  }
+  const isVideo=draft.mediaType==="video";
+  const params=new URLSearchParams({caption:draft.content,access_token:token});
+  if(isVideo){params.set("media_type","REELS");params.set("video_url",draft.mediaUrl);}
+  else{params.set("image_url",draft.mediaUrl);}
+  const container=await metaJson("/"+igId+"/media",token,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:params.toString()});
+  if(!container.ok||!container.data?.id)return{platform:"Instagram",ok:false,message:container.message||"Instagram container creation failed."};
+  const creationId=String(container.data.id);
+  if(isVideo)return{platform:"Instagram",ok:false,pending:true,message:"Instagram accepted the media container; worker will poll and publish it.",externalId:creationId};
+  const published=await metaJson("/"+igId+"/media_publish",token,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({creation_id:creationId}).toString()});
+  if(!published.ok||!published.data?.id)return{platform:"Instagram",ok:false,message:published.message||"Instagram publish failed."};
+  return{platform:"Instagram",ok:true,message:"Published through the official Instagram Graph API.",externalId:String(published.data.id)};
+ }catch(e){return{platform:"Instagram",ok:false,message:e instanceof Error?e.message:"Instagram publishing failed."};}
+}
+async function publishFacebook(draft:Draft):Promise<PublishResult>{
+ const connection=await getConnectionSecret("Facebook");
+ if(!connection?.access_token_enc)return{platform:"Facebook",ok:false,retryable:false,message:"Facebook Page is not connected."};
+ if(!draft.mediaUrl)return{platform:"Facebook",ok:false,retryable:false,message:"Facebook publishing requires a public media URL."};
+ try{
+  const token=await decryptSecret(connection.access_token_enc);
+  const me=await metaJson("/me?fields=id,name",token);
+  if(!me.ok||!me.data?.id)return{platform:"Facebook",ok:false,retryable:false,message:me.message||"Facebook Page could not be resolved."};
+  const pageId=String(me.data.id);
+  if(draft.externalId)return{platform:"Facebook",ok:false,retryable:false,message:"Facebook publish state cannot be resumed safely without a verified post lookup."};
+  const isVideo=draft.mediaType==="video";
+  const params=new URLSearchParams({access_token:token});
+  if(isVideo){params.set("file_url",draft.mediaUrl);params.set("description",draft.content);}
+  else{params.set("url",draft.mediaUrl);params.set("caption",draft.content);}
+  const endpoint=isVideo?"/"+pageId+"/videos":"/"+pageId+"/photos";
+  const result=await metaJson(endpoint,token,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:params.toString()});
+  if(!result.ok||!result.data?.id)return{platform:"Facebook",ok:false,message:result.message||"Facebook publish failed."};
+  return{platform:"Facebook",ok:true,message:"Published through the official Facebook Graph API.",externalId:String(result.data.id)};
+}
+catch(e){return{platform:"Facebook",ok:false,message:e instanceof Error?e.message:"Facebook publishing failed."};}
+}
+
 export async function publishDraft(draft:Draft):Promise<PublishResult>{
  if(draft.platform==="X")return publishX(draft);
  if(draft.platform==="TikTok")return publishTikTok(draft);
+ if(draft.platform==="Instagram")return publishInstagram(draft);
+ if(draft.platform==="Facebook")return publishFacebook(draft);
  return{platform:draft.platform,ok:false,retryable:false,message:"Connector not configured yet. Connect the official platform OAuth/API before publishing."};
 }
