@@ -7,6 +7,7 @@ import {classifyContent} from "./content-intelligence";
 import {StrategyDecision} from "./autonomy";
 import {dbReady,pool} from "./db";
 import {Draft,Platform} from "./types";
+import {generateHiggsfieldVideo,higgsfieldConfigured} from "./higgsfield";
 
 function clean(input:any[],decision:StrategyDecision):Draft[]{
  const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);
@@ -74,13 +75,26 @@ export async function autonomousGenerate(user:any,decision:StrategyDecision){
   if(!safe.length){await releaseUsage(user,"generations");await recordEvent("autonomous_generation",{metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,draftCount:drafts.length,accepted:0,reason:"quality_or_risk_gate"}});return{generated:0,scheduled:0,skipped:"All autonomous candidates failed quality/risk checks."};}
   const fresh=await contentFatigue(safe);
   if(!fresh.length){await releaseUsage(user,"generations");return{generated:0,scheduled:0,skipped:"Content fatigue protection rejected all candidates."};}
+  let videoGenerated=0;
+  if(higgsfieldConfigured() && decision.priority>=85){
+   for(const d of fresh.slice(0,2)){
+    if(d.platform!=="TikTok" && d.platform!=="Instagram")continue;
+    try{
+     const videoPrompt=["Create a short original social video for this verified trend.","Topic: "+decision.topic,"Angle: "+d.angle,"Narration/content: "+d.content,"Style: fast hook, clear visual storytelling, no logos or fabricated claims.","Format: vertical 9:16, 5 seconds, native sound optional."].join("\\n");
+     const video=await generateHiggsfieldVideo({prompt:videoPrompt,duration:5,aspectRatio:"9:16",resolution:"720p",generateAudio:true});
+     d.mediaType="video";d.mediaUrl=video.url;videoGenerated++;
+    }catch(e){
+     await recordEvent("video_generation_failed",{platform:d.platform,metadata:{provider:"higgsfield",trendId:decision.trend.id,error:e instanceof Error?e.message:"unknown"}});
+    }
+   }
+  }
   await saveDrafts(fresh);
   const experiment=await createExperiment(decision.topic,fresh);
   const explorationIds=new Set(fresh.filter((d:any)=>d.exploration).map(d=>d.id));
   const calendar=await allocateAutonomousCalendar(fresh,explorationIds);
   const scheduled=calendar.scheduled;
   await recordEvent("autonomous_generation",{platform:decision.platform,metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,angle:decision.angle,draftCount:fresh.length,accepted:fresh.length,scheduledCount:scheduled.length,experimentId:experiment?.id||null,priority:decision.priority,exploration:decision.exploration,allocation:calendar.allocation}});
-  return{generated:fresh.length,scheduled:scheduled.length,scheduledDrafts:scheduled,allocation:calendar.allocation,experiment};
+  return{generated:fresh.length,scheduled:scheduled.length,scheduledDrafts:scheduled,allocation:calendar.allocation,experiment,videoGenerated};
  }catch(e){
   await releaseUsage(user,"generations");
   try{await recordEvent("autonomous_generation",{platform:decision.platform,metadata:{source:apiKey?"ai":"fallback",trendId:decision.trend.id,angle:decision.angle,accepted:0,reason:e instanceof Error?e.message:"unknown_error"}})}catch{}
