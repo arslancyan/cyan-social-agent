@@ -7,7 +7,7 @@ Discover → Verify → Score → Generate → Adapt → Review → Schedule →
 
 ## Product modes
 - **AI posts:** generate platform-native content from a trend or source.
-- **AI video:** generate short vertical videos through the server-side Higgsfield API; autonomous mode only spends video generation on high-priority, quality-gated candidates.
+- **AI video:** generate short vertical videos through the server-side Higgsfield provider gateway; autonomous mode only spends video generation on high-priority, quality-gated candidates.
 - **Manual posts:** write your own post, save it as a draft, or put it directly into the calendar.
 - **Dynamic scheduler:** the Priority Engine can interrupt flexible scheduled posts when a breakout trend is detected.
 - **Protected posts:** important/sponsored posts can be locked so automation never moves them.
@@ -25,7 +25,7 @@ Social publishing is gated behind official platform APIs and user authorization.
 ## Cloud worker
 `vercel.json` defines a daily fallback worker tick at `/api/worker/tick` for Vercel Hobby. A free GitHub Actions worker also calls the same endpoint every 5 minutes. The dashboard controls the persistent `cyan_control` state; PostgreSQL stores drafts, trends and worker runs. Set `DATABASE_URL` and either `CRON_SECRET` or `CYAN_WORKER_SECRET` before production use. For the GitHub Actions worker, configure repository variable `CYAN_APP_URL` and repository secret `CYAN_WORKER_SECRET`; the latter must match the Vercel secret.
 
-When `TREND_SOURCE_URL` is configured, the worker expects JSON shaped like `{ "trends": [{ "id", "title", "summary", "views", "velocity", "engagement", "freshness", "relevance", "sourceUrl" }] }`, scores each signal, stores it, and may reprioritize flexible scheduled posts when the viral threshold is reached. The actual social publishing adapters still require official OAuth/API connections. Higgsfield video generation requires the server-only `HF_API_KEY` environment variable; CYAN never exposes that credential to the browser. Studio users can generate a video from a TikTok/Instagram draft, while autonomous mode uses a high-priority cost/quality gate.
+When `TREND_SOURCE_URL` is configured, the worker expects JSON shaped like `{ "trends": [{ "id", "title", "summary", "views", "velocity", "engagement", "freshness", "relevance", "sourceUrl" }] }`, scores each signal, stores it, and may reprioritize flexible scheduled posts when the viral threshold is reached. The actual social publishing adapters still require official OAuth/API connections. Higgsfield video generation requires server-only `HF_API_KEY` plus the configured provider gateway (`HF_VIDEO_WEBHOOK_URL` and status URL); CYAN never exposes that credential to the browser. Studio users can generate a video from a TikTok/Instagram draft, while autonomous mode uses a high-priority cost/quality gate.
 
 ## Local development
 ```bash
