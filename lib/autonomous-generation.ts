@@ -78,7 +78,7 @@ export async function autonomousGenerate(user:any,decision:StrategyDecision){
   let videoGenerated=0;
   if(higgsfieldConfigured() && decision.priority>=85){
    for(const d of fresh.slice(0,2)){
-    if(d.platform!=="TikTok" && d.platform!=="Instagram")continue;
+    if(d.platform!=="TikTok" && d.platform!=="Instagram" && d.platform!=="Facebook")continue;
     try{
      const videoPrompt=["Create a short original social video for this verified trend.","Topic: "+decision.topic,"Angle: "+d.angle,"Narration/content: "+d.content,"Style: fast hook, clear visual storytelling, no logos or fabricated claims.","Format: vertical 9:16, 5 seconds, native sound optional."].join("\\n");
      const video=await generateHiggsfieldVideo({prompt:videoPrompt,duration:5,aspectRatio:"9:16",resolution:"720p",generateAudio:true});
