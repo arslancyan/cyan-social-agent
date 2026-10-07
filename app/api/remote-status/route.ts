@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {currentUser,runAsUser} from "@/lib/auth";
+import {currentUser,runAsUser,workspaceId} from "@/lib/auth";
 import {dbReady,pool} from "@/lib/db";
 import {getControl,latestWorkerRun} from "@/lib/store";
 
@@ -13,9 +13,9 @@ export async function GET(){
    await dbReady();
    const control=await getControl();
    const [queue,trends,published]=await Promise.all([
-    pool.query("SELECT COUNT(*)::int AS count FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled'",[user.id]),
-    pool.query("SELECT COUNT(*)::int AS count FROM cyan_trends WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '2 hours'",[user.id]),
-    pool.query("SELECT COUNT(*)::int AS count FROM cyan_events WHERE workspace_id=$1 AND type='publish' AND created_at>=CURRENT_DATE",[user.id])
+    pool.query("SELECT COUNT(*)::int AS count FROM cyan_drafts WHERE workspace_id=$1 AND status='scheduled'",[workspaceId()]),
+    pool.query("SELECT COUNT(*)::int AS count FROM cyan_trends WHERE workspace_id=$1 AND created_at>=NOW()-INTERVAL '2 hours'",[workspaceId()]),
+    pool.query("SELECT COUNT(*)::int AS count FROM cyan_events WHERE workspace_id=$1 AND type='publish' AND created_at>=CURRENT_DATE",[workspaceId()])
    ]);
    const worker=await latestWorkerRun();
    const heartbeat=control.heartbeatAt?new Date(control.heartbeatAt):null;
