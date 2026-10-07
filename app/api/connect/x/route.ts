@@ -6,7 +6,7 @@ function b64url(bytes:Uint8Array){return Buffer.from(bytes).toString("base64url"
 
 export async function GET(){
  const user=await requireUser();if(!(await rateLimit("oauth:x:"+user.id,10,600)))return NextResponse.json({error:"Too many X connection attempts. Try again later."},{status:429});
- await requireWorkspaceRole(user.id,["owner","admin"]); const oauthWorkspace=await runAsUser(user,async()=>{await requireWorkspaceRole(user.id,["owner","admin"]);return workspaceId();}); const clientId=process.env.X_CLIENT_ID;
+ const oauthWorkspace=await runAsUser(user,async()=>{await requireWorkspaceRole(user.id,["owner","admin"]);return workspaceId();}); const clientId=process.env.X_CLIENT_ID;
  const redirect=process.env.X_REDIRECT_URI;
  if(!clientId||!redirect) return NextResponse.json({error:"X OAuth is not configured. Set X_CLIENT_ID and X_REDIRECT_URI."},{status:503});
  const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));
