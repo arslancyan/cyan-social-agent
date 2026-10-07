@@ -8,7 +8,7 @@ export type HiggsfieldVideoOptions={
 };
 
 export function higgsfieldConfigured(){
- return Boolean(process.env.HF_API_KEY||process.env.HF_CREDENTIALS);
+ return Boolean((process.env.HF_API_KEY||process.env.HF_CREDENTIALS)&&process.env.HF_VIDEO_WEBHOOK_URL);
 }
 
 /*
