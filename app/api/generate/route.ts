@@ -4,6 +4,7 @@ import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspa
 import {Platform} from "@/lib/types";
 import {buildBrainContext,inspectDraft} from "@/lib/agent";
 import {adaptivePlan,generationStrategy,createExperiment,platformAdaptationPlans} from "@/lib/adaptive";
+import {isCryptoContent} from "@/lib/crypto-topic";
 function cleanDrafts(input:any[],requestedPlatform=""):any[]{const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);return input.filter(x=>x&&allowed.has(x.platform)&&(!requestedPlatform||x.platform===requestedPlatform)&&typeof x.content==="string"&&x.content.trim()).slice(0,6).map(x=>({id:x.id||crypto.randomUUID(),platform:x.platform,angle:typeof x.angle==="string"&&x.angle.trim()?x.angle.trim():"Draft",content:x.content.trim().slice(0,10000),status:"review",mediaType:x.mediaType==="video"||x.mediaType==="image"?x.mediaType:undefined,mediaUrl:typeof x.mediaUrl==="string"&&/^https?:\/\//i.test(x.mediaUrl)?x.mediaUrl:undefined,exploration:Boolean(x.exploration)}));}
 function parseModelOutput(raw:string){const trimmed=raw.trim().replace(/^\`\`\`(?:json)?/i,"").replace(/\`\`\`$/,"").trim();try{return JSON.parse(trimmed)}catch{}const start=trimmed.indexOf("[");const end=trimmed.lastIndexOf("]");if(start>=0&&end>start){try{return JSON.parse(trimmed.slice(start,end+1))}catch{}}return []}
 export async function POST(req:Request){
@@ -16,6 +17,7 @@ export async function POST(req:Request){
   const trendId=typeof body.trendId==="string"&&body.trendId.length<=200?body.trendId:"";
   const platform=typeof body.platform==="string"&&["X","TikTok","Instagram","Facebook"].includes(body.platform)?body.platform:"";
   if(!topic||topic.length>4000)return NextResponse.json({error:"Topic is required and must be 1–4000 characters."},{status:400});
+  if(!isCryptoContent(topic))return NextResponse.json({error:"CYAN is configured for crypto content only. Add a clear crypto topic such as Bitcoin, Ethereum, Solana, DeFi, or memecoins."},{status:400});
   const allowed=await consumeUsage(user,"generations");
   if(!allowed)return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});
   let drafts:any[]=[];
