@@ -3,6 +3,7 @@ import {listDrafts,saveDrafts,updateStatus,updateStatusesAtomic} from "@/lib/sto
 import {buildDrafts} from "@/lib/agent";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspaceRole} from "@/lib/auth";
 import {isCryptoContent} from "@/lib/crypto-topic";
+import {setReplyOptInConfirmation} from "@/lib/store";
 
 export async function GET(){
  try{const u=await requireUser();return NextResponse.json(await runAsUser(u,async()=>({drafts:await listDrafts()})))}
@@ -55,6 +56,6 @@ export async function PATCH(req:Request){
   if(b.status==="scheduled"&&(typeof b.scheduledAt!=="string"||Number.isNaN(Date.parse(b.scheduledAt))))return NextResponse.json({error:"Scheduled posts require a valid scheduledAt"},{status:400});
   if(b.status==="scheduled"&&new Date(b.scheduledAt).getTime()<=Date.now())return NextResponse.json({error:"scheduledAt must be in the future"},{status:400});
   if(b.status!=="scheduled"&&b.scheduledAt!==undefined&&b.scheduledAt!==null&&Number.isNaN(Date.parse(b.scheduledAt)))return NextResponse.json({error:"Invalid scheduledAt"},{status:400});
-  return NextResponse.json(await runAsUser(u,async()=>{const draft=await updateStatus(b.id,b.status,b.scheduledAt);return draft?{draft}:{error:"Draft not found"}}))
+  return NextResponse.json(await runAsUser(u,async()=>{if(b.replyOptInConfirmed!==undefined&&typeof b.replyOptInConfirmed!=="boolean")return{error:"replyOptInConfirmed must be a boolean"};if(typeof b.replyOptInConfirmed==="boolean"){const confirmed=await setReplyOptInConfirmation(b.id,b.replyOptInConfirmed);if(!confirmed)return{error:"Reply draft not found or not eligible for opt-in confirmation"};}const draft=await updateStatus(b.id,b.status,b.scheduledAt);return draft?{draft}:{error:"Draft not found"}}))
  }catch(e){if(e instanceof Error&&e.message.toLowerCase().includes("unauth"))return NextResponse.json({error:"Unauthorized"},{status:401});console.error("Draft PATCH failed",e);return NextResponse.json({error:"Draft service unavailable"},{status:503})}
 }
