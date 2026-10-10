@@ -30,6 +30,10 @@ In **Settings → Secrets and variables → Actions → New repository secret**,
 
 Never paste these keys into an issue, source file, or chat.
 
+## Strict $0 budget
+
+CYAN is being developed under a **$0 budget**. Do not enable paid plans, billing, trials that require payment, metered AI APIs, or paid hosting. Review [the zero-cost policy](docs/zero-cost-policy.md) before enabling any integration. GitHub Actions can run bounded jobs but does not host the interactive Next.js API; a full ChatGPT MCP connection must wait until a genuinely free HTTPS backend is available and verified. Never enter secrets in chat or commit them.
+
 ### YouTube OAuth and publishing
 
 The `feature/youtube-social-publisher` branch adds a YouTube connection flow and official YouTube Data API upload support. Before testing, configure a Google Cloud project, enable **YouTube Data API v3**, create an OAuth web client, and add this exact authorized redirect URI:
