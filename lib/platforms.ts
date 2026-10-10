@@ -28,21 +28,23 @@ async function refreshX(refreshToken:string){
  if(!response.ok)throw new Error("X token refresh failed");
  return response.json();
 }
-async function postX(token:string,text:string){
- return fetchWithTimeout("https://api.x.com/2/tweets",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},body:JSON.stringify({text})});
+async function postX(token:string,draft:Draft){
+ const payload:any={text:draft.content};
+ if(draft.replyToId){if(!draft.replyOptInConfirmed)throw new Error("Reply blocked: confirm the recipient opted in before sending.");payload.reply={in_reply_to_tweet_id:draft.replyToId};}
+ return fetchWithTimeout("https://api.x.com/2/tweets",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},body:JSON.stringify(payload)});
 }
 async function publishX(draft:Draft):Promise<PublishResult>{
  const connection=await getConnectionSecret("X");
  if(!connection?.access_token_enc)return{platform:"X",ok:false,retryable:false,message:"X is not connected."};
  try{
   let token=await decryptSecret(connection.access_token_enc);
-  let response=await postX(token,draft.content);
+  let response=await postX(token,draft);
   if(response.status===401&&connection.refresh_token_enc){
    const refreshed=await refreshX(await decryptSecret(connection.refresh_token_enc));
    if(!refreshed.access_token)return{platform:"X",ok:false,message:"X refresh did not return an access token."};
    token=refreshed.access_token;
    await updateConnectionTokens("X",await encryptSecret(token),refreshed.refresh_token?await encryptSecret(refreshed.refresh_token):undefined);
-   response=await postX(token,draft.content);
+   response=await postX(token,draft);
   }
   const data=await response.json().catch(()=>({}));
   if(!response.ok)return{platform:"X",ok:false,message:data?.detail||data?.title||"X API rejected the post."};
