@@ -3,6 +3,7 @@ import {isIP} from "net";
 import {addManualDraft} from "@/lib/store";
 import {Draft,Platform} from "@/lib/types";
 import {requireUser,runAsUser,rateLimit,requireWorkspaceRole} from "@/lib/auth";
+import {isCryptoContent} from "@/lib/crypto-topic";
 
 const platforms=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);
 
@@ -39,6 +40,7 @@ export async function POST(req:NextRequest){
   await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));
   const b=await req.json();
   if(typeof b.content!=="string"||!b.content.trim()||b.content.length>10000)return NextResponse.json({error:"content is required"},{status:400});
+  if(!isCryptoContent(b.content))return NextResponse.json({error:"CYAN only publishes crypto content. Add relevant crypto context before scheduling."},{status:400});
   if(!platforms.has(b.platform))return NextResponse.json({error:"Unsupported platform"},{status:400});
   if(b.scheduledAt&&String(b.scheduledAt).length>80)return NextResponse.json({error:"scheduledAt is too long"},{status:400});
   if(b.scheduledAt&&Number.isNaN(Date.parse(b.scheduledAt)))return NextResponse.json({error:"Invalid scheduledAt"},{status:400});
