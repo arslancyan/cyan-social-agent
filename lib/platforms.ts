@@ -53,6 +53,56 @@ async function publishX(draft:Draft):Promise<PublishResult>{
   return{platform:"X",ok:true,message:"Published through the official X API.",externalId};
  }catch(e){return{platform:"X",ok:false,message:e instanceof Error?e.message:"X publishing failed."};}
 }
+
+async function refreshYouTube(refreshToken:string){
+ const clientId=process.env.GOOGLE_CLIENT_ID,clientSecret=process.env.GOOGLE_CLIENT_SECRET;
+ if(!clientId||!clientSecret)throw new Error("Google OAuth credentials are not configured.");
+ const body=new URLSearchParams({client_id:clientId,client_secret:clientSecret,refresh_token:refreshToken,grant_type:"refresh_token"});
+ const response=await fetchWithTimeout("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||!data.access_token)throw new Error("YouTube access token refresh failed.");
+ return data;
+}
+async function publishYouTube(draft:Draft):Promise<PublishResult>{
+ const connection=await getConnectionSecret("YouTube");
+ if(!connection?.access_token_enc)return{platform:"YouTube",ok:false,retryable:false,message:"YouTube is not connected."};
+ if(!draft.mediaUrl||draft.mediaType!=="video")return{platform:"YouTube",ok:false,retryable:false,message:"YouTube publishing requires a public HTTPS video URL."};
+ try{
+  let token=await decryptSecret(connection.access_token_enc);
+  const refresh=async()=>{
+   if(!connection.refresh_token_enc)throw new Error("YouTube access token expired and no refresh token is available. Reconnect YouTube.");
+   const next=await refreshYouTube(await decryptSecret(connection.refresh_token_enc));
+   token=String(next.access_token);
+   await updateConnectionTokens("YouTube",await encryptSecret(token),next.refresh_token?await encryptSecret(String(next.refresh_token)):undefined);
+  };
+  const mediaResponse=await fetchWithTimeout(draft.mediaUrl,{},120000);
+  if(!mediaResponse.ok)return{platform:"YouTube",ok:false,retryable:false,message:"CYAN could not fetch the public video URL."};
+  const mime=(mediaResponse.headers.get("content-type")||"video/mp4").split(";")[0].trim();
+  if(!mime.startsWith("video/"))return{platform:"YouTube",ok:false,retryable:false,message:"The media URL did not return a video file."};
+  const bytes=await mediaResponse.arrayBuffer();
+  if(bytes.byteLength===0||bytes.byteLength>512*1024*1024)return{platform:"YouTube",ok:false,retryable:false,message:"Video must be non-empty and no larger than 512 MB for this hosted upload path."};
+  const title=(draft.content.split(/\r?\n/)[0]||"CYAN video").slice(0,100);
+  const privacy=["private","unlisted","public"].includes(process.env.YOUTUBE_DEFAULT_PRIVACY_STATUS||"private")?(process.env.YOUTUBE_DEFAULT_PRIVACY_STATUS||"private"):"private";
+  const tags=[...draft.content.matchAll(/#[\p{L}\p{N}_]+/gu)].map(m=>m[0].slice(1)).slice(0,20);
+  const startUpload=async()=>{
+   return fetchWithTimeout("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",{
+    method:"POST",
+    headers:{"authorization":"Bearer "+token,"content-type":"application/json; charset=UTF-8","x-upload-content-type":mime,"x-upload-content-length":String(bytes.byteLength)},
+    body:JSON.stringify({snippet:{title,description:draft.content,tags,categoryId:"22"},status:{privacyStatus:privacy,selfDeclaredMadeForKids:false}})
+   });
+  };
+  let init=await startUpload();
+  if(init.status===401){await refresh();init=await startUpload();}
+  if(!init.ok)return{platform:"YouTube",ok:false,message:"YouTube rejected upload initialization. Check OAuth scopes, API enablement and quota."};
+  const uploadUrl=init.headers.get("location");
+  if(!uploadUrl)return{platform:"YouTube",ok:false,message:"YouTube did not return a resumable upload URL."};
+  const uploaded=await fetchWithTimeout(uploadUrl,{method:"PUT",headers:{"content-type":mime,"content-length":String(bytes.byteLength)},body:bytes},120000);
+  const result=await uploaded.json().catch(()=>({}));
+  if(!uploaded.ok||!result?.id)return{platform:"YouTube",ok:false,message:"YouTube video upload did not complete successfully."};
+  return{platform:"YouTube",ok:true,message:"Uploaded through the official YouTube Data API. Shorts classification depends on the video's format and current YouTube rules.",externalId:String(result.id)};
+ }catch(e){return{platform:"YouTube",ok:false,message:e instanceof Error?e.message:"YouTube publishing failed."};}
+}
+
 async function refreshTikTok(refreshToken:string){
  const key=process.env.TIKTOK_CLIENT_KEY,secret=process.env.TIKTOK_CLIENT_SECRET;
  if(!key||!secret)throw new Error("TikTok OAuth credentials are not configured");
@@ -159,6 +209,7 @@ catch(e){return{platform:"Facebook",ok:false,message:e instanceof Error?e.messag
 
 export async function publishDraft(draft:Draft):Promise<PublishResult>{
  if(draft.platform==="X")return publishX(draft);
+ if(draft.platform==="YouTube")return publishYouTube(draft);
  if(draft.platform==="TikTok")return publishTikTok(draft);
  if(draft.platform==="Instagram")return publishInstagram(draft);
  if(draft.platform==="Facebook")return publishFacebook(draft);
