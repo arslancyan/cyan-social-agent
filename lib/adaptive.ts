@@ -109,7 +109,8 @@ const ADAPTATION_PROFILES:Record<Platform,Omit<PlatformAdaptation,"platform"|"an
  X:{hook:"sharp concise hook",length:"short",cta:"specific question or useful opinion",format:"post/thread",media:"image",tone:"direct conversational insight-first"},
  TikTok:{hook:"front-load curiosity or payoff",length:"medium",cta:"simple comment or retention prompt",format:"short-video",media:"video",tone:"fast visual energetic retention-first"},
  Instagram:{hook:"clear first visual or caption line",length:"medium",cta:"invite saves shares or focused comment",format:"reel/carousel/caption",media:"image",tone:"visual-first polished concise"},
- Facebook:{hook:"give context and why it matters",length:"long",cta:"invite substantive discussion",format:"post/video",media:"image",tone:"context-rich approachable discussion-first"}
+ Facebook:{hook:"give context and why it matters",length:"long",cta:"invite substantive discussion",format:"post/video",media:"image",tone:"context-rich approachable discussion-first"},
+ YouTube:{hook:"state the payoff in the opening seconds",length:"medium",cta:"ask viewers to subscribe or comment when relevant",format:"Shorts/YouTube video",media:"video",tone:"clear searchable educational storytelling"}
 };
 const adaptationClamp=(n:number)=>Math.max(0,Math.min(100,Math.round(n)));
 export async function platformAdaptationPlans():Promise<PlatformAdaptation[]>{
