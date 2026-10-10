@@ -21,7 +21,7 @@ describe("draft helpers",()=>{
  it("creates short English post and reply drafts",()=>{
   assert.ok(buildPost("Bitcoin ETF inflows").length<=280);
   assert.match(buildReplyDraft("Solana DEX liquidity grows","Solana"),/Solana/);
-  assert.equal(topicOf("NFTs on Ethereum"),"NFTs");
+  assert.equal(topicOf("NFT marketplace"),"NFTs");
  });
  it("signs X requests with OAuth 1.0a",()=>{
   const header=oauth1Header("GET","https://api.x.com/2/tweets/search/recent",{query:"bitcoin",max_results:"10"},{consumerKey:"key",consumerSecret:"secret",accessToken:"token",tokenSecret:"tokensecret"},"nonce","1700000000");
