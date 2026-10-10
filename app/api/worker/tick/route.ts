@@ -1,10 +1,10 @@
 import {NextRequest,NextResponse} from "next/server";
 import {dbReady,pool,withWorkerLock} from "@/lib/db";
-import {listAgentWorkspaces,runAsUser,workspaceId} from "@/lib/auth";
-import {getControl,heartbeat,recordEvent,recordWorker,recoverStalePublishing,saveTrends,dueDrafts,updateStatus} from "@/lib/store";
+import {consumeUsage,listAgentWorkspaces,releaseUsage,runAsUser,workspaceId} from "@/lib/auth";
+import {getConnectionSecret,getControl,heartbeat,recordEvent,recordWorker,recoverStalePublishing,saveTrends,dueDrafts,updateStatus,saveDrafts} from "@/lib/store";
 import {publishDraft} from "@/lib/platforms";
 import {scoreTrend} from "@/lib/scoring";
-import {Trend} from "@/lib/types";
+import {Draft,Trend} from "@/lib/types";
 import {filterCryptoTopics,isCryptoContent} from "@/lib/crypto-topic";
 import {monitorViralCryptoPosts} from "@/lib/viral-monitor";
 import {POST_INTERVAL_HOURS,POST_INTERVAL_MS,VIRAL_SCAN_INTERVAL_MS,VIRAL_VIEWS_THRESHOLD,CONTENT_LANGUAGE} from "@/lib/crypto-agent-config";
@@ -42,7 +42,31 @@ async function pollCryptoNews(){
   return{id:workspaceId()+"-gdelt-"+String(a.url||i),title:String(a.title||"Crypto news"),summary:String(a.domain||"Crypto news")+" · English crypto news",sourceUrl:typeof a.url==="string"?a.url:undefined,score:scoreTrend({velocity,engagement:50,freshness:Math.max(10,100-age*25),relevance:90,views:0}),velocity,relevance:90,createdAt:new Date().toISOString()};
  });
  await saveTrends(trends);
- return{fetched:trends.length,top:trends[0]||null};
+ return{fetched:trends.length,top:[...trends].sort((a,b)=>b.score-a.score)[0]||null};
+}
+
+async function createAutomaticCryptoPost(user:any,trend:Trend){
+ if(!isCryptoContent(trend.title+" "+trend.summary))return{created:false,reason:"crypto_only_guard"};
+ const connection=await getConnectionSecret("X");
+ if(!connection?.access_token_enc)return{created:false,reason:"X_not_connected"};
+ const recent=await pool.query("SELECT created_at FROM cyan_events WHERE workspace_id=$1 AND type='auto_post_attempt' ORDER BY created_at DESC LIMIT 1",[workspaceId()]);
+ const lastAttempt=recent.rows[0]?.created_at?new Date(recent.rows[0].created_at).getTime():0;
+ if(Date.now()-lastAttempt<POST_INTERVAL_MS)return{created:false,reason:"auto_post_cooldown"};
+ const scheduled=await pool.query("SELECT 1 FROM cyan_drafts WHERE workspace_id=$1 AND status IN ('scheduled','publishing') LIMIT 1",[workspaceId()]);
+ if(scheduled.rowCount)return{created:false,reason:"scheduled_post_already_queued"};
+ if(!(await consumeUsage(user,"generations")))return{created:false,reason:"generation_limit"};
+ let content="Crypto watch: "+trend.title.slice(0,140)+". What signal would confirm this trend next?";
+ const apiKey=process.env.OPENAI_API_KEY;
+ if(apiKey){
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
+  try{
+   const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+apiKey},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-6-luna",input:["Write one concise English X post (under 260 characters) about this crypto news item.","Use only facts in the title/summary/source; do not invent statistics or price predictions.","No financial advice, no buy/sell pressure, no guaranteed returns. Ask a useful question or highlight what to watch next.","Return only the post text.","Title: "+trend.title,"Summary: "+trend.summary,"Source: "+(trend.sourceUrl||"not supplied")].join("\\n")}),signal:controller.signal});
+   if(response.ok){const data=await response.json();const candidate=String(data.output_text||"").trim().replace(/^["']|["']$/g,"");if(candidate&&isCryptoContent(candidate+" "+trend.title))content=candidate.slice(0,280);}
+  }catch{}finally{clearTimeout(timer);}
+ }
+ const draft:Draft={id:"auto-crypto-"+crypto.randomUUID(),platform:"X",angle:"Crypto auto post · English · 3-hour cadence",content,status:"scheduled",scheduledAt:new Date(Date.now()+60*1000).toISOString(),trendId:trend.id};
+ try{await saveDrafts([draft]);await recordEvent("auto_post_attempt",{platform:"X",draftId:draft.id,metadata:{trendId:trend.id,sourceUrl:trend.sourceUrl||null,generatedBy:apiKey?"openai_or_fallback":"fallback"}});return{created:true,draftId:draft.id,scheduledAt:draft.scheduledAt};}
+ catch(e){await releaseUsage(user,"generations");throw e;}
 }
 
 async function run(req:NextRequest){
@@ -60,8 +84,8 @@ async function run(req:NextRequest){
       await heartbeat();
       const recovered=await recoverStalePublishing();
       if(control.paused){await recordWorker(true,"Crypto worker paused.");return{paused:true,recovered,news:0,viral:null,published:0,nextPostAt:null};}
-      let news=0;let newsError:string|undefined;
-      try{news=(await pollCryptoNews()).fetched;}catch(e){newsError=e instanceof Error?e.message:"Crypto news scan failed";}
+      let news=0;let newsTop:Trend|null=null;let newsError:string|undefined;
+      try{const scan=await pollCryptoNews();news=scan.fetched;newsTop=scan.top;}catch(e){newsError=e instanceof Error?e.message:"Crypto news scan failed";}
       let viral:any={skipped:"Waiting for next viral scan window."};
       const recentScan=await pool.query("SELECT created_at FROM cyan_events WHERE workspace_id=$1 AND type='viral_reply_scan' ORDER BY created_at DESC LIMIT 1",[workspaceId()]);
       const lastScan=recentScan.rows[0]?.created_at?new Date(recentScan.rows[0].created_at).getTime():0;
@@ -72,7 +96,9 @@ async function run(req:NextRequest){
       const lastPublish=await pool.query("SELECT created_at FROM cyan_events WHERE workspace_id=$1 AND type='publish' ORDER BY created_at DESC LIMIT 1",[workspaceId()]);
       const lastPublishedAt=lastPublish.rows[0]?.created_at?new Date(lastPublish.rows[0].created_at).getTime():0;
       const canPublish=Date.now()-lastPublishedAt>=POST_INTERVAL_MS;
-      const due=canPublish?await dueDrafts():[];
+      let due=canPublish?await dueDrafts():[];
+      let autoPost:any={created:false,reason:canPublish?"no_crypto_trend":"posting_cooldown"};
+      if(canPublish&&due.length===0&&newsTop){try{autoPost=await createAutomaticCryptoPost(user,newsTop);}catch(e){autoPost={created:false,error:e instanceof Error?e.message:"Automatic post generation failed"};}}
       let published=0;let blocked=0;let nextPostAt=canPublish?null:new Date(lastPublishedAt+POST_INTERVAL_MS).toISOString();
       for(const draft of due){
        if(!isCryptoContent(draft.content+" "+draft.angle)){
@@ -98,9 +124,9 @@ async function run(req:NextRequest){
        blocked++;
        break;
       }
-      const detail="crypto_news="+news+"; viral_drafts="+Number(viral.draftsCreated||0)+"; published="+published+"; blocked="+blocked+"; interval_hours=3";
+      const detail="crypto_news="+news+"; auto_post_created="+Boolean(autoPost.created)+"; viral_drafts="+Number(viral.draftsCreated||0)+"; published="+published+"; blocked="+blocked+"; interval_hours=3";
       await recordWorker(blocked===0,detail+(newsError?"; news_error="+newsError:""));
-      return{paused:false,recovered,news,newsError,viral,published,blocked,nextPostAt,postingIntervalHours:POST_INTERVAL_HOURS,viralThresholdViews:VIRAL_VIEWS_THRESHOLD,language:CONTENT_LANGUAGE};
+      return{paused:false,recovered,news,newsError,viral,autoPost,published,blocked,nextPostAt,postingIntervalHours:POST_INTERVAL_HOURS,viralThresholdViews:VIRAL_VIEWS_THRESHOLD,language:CONTENT_LANGUAGE};
      },workspace.id);
      summaries.push({workspace:workspace.id,workspaceName:workspace.name,...result});
     }catch(e){const message=e instanceof Error?e.message:"Workspace tick failed";summaries.push({workspace:workspace.id,error:message});try{await runAsUser(user,()=>recordWorker(false,message),workspace.id)}catch{}}
