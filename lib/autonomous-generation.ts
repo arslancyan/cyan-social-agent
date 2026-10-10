@@ -8,6 +8,7 @@ import {StrategyDecision} from "./autonomy";
 import {dbReady,pool} from "./db";
 import {Draft,Platform} from "./types";
 import {generateHiggsfieldVideo,higgsfieldConfigured} from "./higgsfield";
+import {isCryptoContent} from "./crypto-topic";
 
 function clean(input:any[],decision:StrategyDecision):Draft[]{
  const allowed=new Set<Platform>(["X","TikTok","Instagram","Facebook"]);
@@ -49,6 +50,7 @@ async function generationGuard(decision:StrategyDecision){
 }
 
 export async function autonomousGenerate(user:any,decision:StrategyDecision){
+ if(!isCryptoContent(decision.topic+" "+decision.trend.title+" "+decision.trend.summary))return {generated:0,scheduled:0,skipped:"Crypto-only policy blocked a non-crypto trend."};
  if(decision.priority<70||!decision.trend.sourceUrl)return {generated:0,scheduled:0,skipped:"Trend is below the autonomous threshold or has no source URL."};
  const guard=await generationGuard(decision); if(guard)return {generated:0,scheduled:0,skipped:guard};
  const capacity=await pool.query("SELECT COUNT(*)::int count FROM cyan_drafts WHERE workspace_id=$1 AND status IN ('review','scheduled','publishing')",[await import("./auth").then(x=>x.workspaceId())]);
