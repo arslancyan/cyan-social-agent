@@ -7,11 +7,10 @@ import {scoreTrend} from "@/lib/scoring";
 import {Trend} from "@/lib/types";
 import {filterCryptoTopics,isCryptoContent} from "@/lib/crypto-topic";
 import {monitorViralCryptoPosts} from "@/lib/viral-monitor";
+import {POST_INTERVAL_HOURS,POST_INTERVAL_MS,VIRAL_SCAN_INTERVAL_MS,VIRAL_VIEWS_THRESHOLD,CONTENT_LANGUAGE} from "@/lib/crypto-agent-config";
 
 export const dynamic="force-dynamic";
 export const maxDuration=300;
-const POST_INTERVAL_MS=3*60*60*1000;
-const VIRAL_SCAN_INTERVAL_MS=15*60*1000;
 
 async function authorized(req:NextRequest){
  const secret=process.env.CYAN_WORKER_SECRET||process.env.CRON_SECRET;
@@ -101,7 +100,7 @@ async function run(req:NextRequest){
       }
       const detail="crypto_news="+news+"; viral_drafts="+Number(viral.draftsCreated||0)+"; published="+published+"; blocked="+blocked+"; interval_hours=3";
       await recordWorker(blocked===0,detail+(newsError?"; news_error="+newsError:""));
-      return{paused:false,recovered,news,newsError,viral,published,blocked,nextPostAt,postingIntervalHours:3,viralThresholdViews:500000,language:"en"};
+      return{paused:false,recovered,news,newsError,viral,published,blocked,nextPostAt,postingIntervalHours:POST_INTERVAL_HOURS,viralThresholdViews:VIRAL_VIEWS_THRESHOLD,language:CONTENT_LANGUAGE};
      },workspace.id);
      summaries.push({workspace:workspace.id,workspaceName:workspace.name,...result});
     }catch(e){const message=e instanceof Error?e.message:"Workspace tick failed";summaries.push({workspace:workspace.id,error:message});try{await runAsUser(user,()=>recordWorker(false,message),workspace.id)}catch{}}
