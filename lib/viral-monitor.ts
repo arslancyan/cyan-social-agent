@@ -4,9 +4,8 @@ import {decryptSecret} from "./crypto";
 import {getConnectionSecret,recordEvent,saveDrafts} from "./store";
 import {Draft} from "./types";
 import {isCryptoContent} from "./crypto-topic";
+import {VIRAL_VIEWS_THRESHOLD,CONTENT_LANGUAGE,X_CRYPTO_SEARCH_QUERY} from "./crypto-agent-config";
 
-const VIEWS_THRESHOLD=500_000;
-const TOPIC_QUERY='(bitcoin OR BTC OR ethereum OR ETH OR solana OR SOL OR DeFi OR memecoin OR "meme coin" OR NFT OR NFTs) -is:retweet lang:en';
 
 function topicLabel(text:string){
  const rules:[RegExp,string][]=[
@@ -46,7 +45,7 @@ export async function monitorViralCryptoPosts(){
  if(!connection?.access_token_enc)return {scanned:0,qualified:0,draftsCreated:0,skipped:"X is not connected."};
  let token:string;
  try{token=await decryptSecret(connection.access_token_enc);}catch{return {scanned:0,qualified:0,draftsCreated:0,skipped:"Could not decrypt the X access token."};}
- const url="https://api.x.com/2/tweets/search/recent?query="+encodeURIComponent(TOPIC_QUERY)+"&max_results=100&tweet.fields=created_at,lang,public_metrics,author_id";
+ const url="https://api.x.com/2/tweets/search/recent?query="+encodeURIComponent(X_CRYPTO_SEARCH_QUERY)+"&max_results=100&tweet.fields=created_at,lang,public_metrics,author_id";
  const response=await fetch(url,{headers:{authorization:"Bearer "+token,accept:"application/json"},signal:AbortSignal.timeout(15000)});
  if(!response.ok){
   const body=await response.text().catch(()=>"");
@@ -57,7 +56,7 @@ export async function monitorViralCryptoPosts(){
  const qualified=tweets.filter((tweet:any)=>{
   const text=String(tweet.text||"");
   const views=Number(tweet.public_metrics?.impression_count||0);
-  return tweet.lang==="en"&&views>=VIEWS_THRESHOLD&&isCryptoContent(text);
+  return tweet.lang===CONTENT_LANGUAGE&&views>=VIRAL_VIEWS_THRESHOLD&&isCryptoContent(text);
  });
  let draftsCreated=0;
  for(const tweet of qualified){
@@ -81,5 +80,5 @@ export async function monitorViralCryptoPosts(){
   await recordEvent("viral_reply_draft",{platform:"X",draftId:draft.id,externalId:sourceId,metadata:{views:Number(tweet.public_metrics?.impression_count||0),topic,language:"en"}});
   draftsCreated++;
  }
- return {scanned:tweets.length,qualified:qualified.length,draftsCreated,threshold:VIEWS_THRESHOLD,language:"en"};
+ return {scanned:tweets.length,qualified:qualified.length,draftsCreated,threshold:VIRAL_VIEWS_THRESHOLD,language:CONTENT_LANGUAGE};
 }
