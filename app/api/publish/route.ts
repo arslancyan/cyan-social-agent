@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {publishDraft} from "@/lib/platforms";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspaceRole} from "@/lib/auth";
 import {claimManualPublish,recordEvent,updateStatus} from "@/lib/store";
+import {isCryptoContent} from "@/lib/crypto-topic";
 
 export async function POST(req:Request){
  try{
@@ -14,6 +15,7 @@ export async function POST(req:Request){
   if(!allowed)return NextResponse.json({error:"Daily publishing limit reached for your plan."},{status:429});
   const draft=await runAsUser(user,()=>claimManualPublish(b.draft.id));
   if(!draft){await releaseUsage(user,"publishes");return NextResponse.json({error:"Draft is no longer available for publishing."},{status:409});}
+  if(!isCryptoContent(draft.content+" "+draft.angle)){await releaseUsage(user,"publishes");await runAsUser(user,()=>updateStatus(draft.id,"review",undefined,null));return NextResponse.json({error:"Crypto-only policy blocked this draft. Edit it to include relevant crypto context before publishing."},{status:400});}
   let result:Awaited<ReturnType<typeof publishDraft>>;
   try{result=await runAsUser(user,()=>publishDraft(draft));}catch(e){
    await releaseUsage(user,"publishes");
