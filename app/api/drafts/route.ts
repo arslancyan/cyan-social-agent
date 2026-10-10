@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {listDrafts,saveDrafts,updateStatus,updateStatusesAtomic} from "@/lib/store";
 import {buildDrafts} from "@/lib/agent";
 import {consumeUsage,releaseUsage,rateLimit,requireUser,runAsUser,requireWorkspaceRole} from "@/lib/auth";
+import {isCryptoContent} from "@/lib/crypto-topic";
 
 export async function GET(){
  try{const u=await requireUser();return NextResponse.json(await runAsUser(u,async()=>({drafts:await listDrafts()})))}
@@ -14,6 +15,7 @@ export async function POST(req:Request){
   if(!(await rateLimit("drafts:"+u.id,30,60)))return NextResponse.json({error:"Draft rate limit reached. Try again shortly."},{status:429});
   const b=await req.json().catch(()=>({}));
   if(!b.topic||typeof b.topic!=="string"||b.topic.trim().length===0||b.topic.length>4000)return NextResponse.json({error:"Topic is required and must be 1–4000 characters."},{status:400});
+  if(!isCryptoContent(b.topic))return NextResponse.json({error:"CYAN only creates crypto content. Specify a crypto topic such as Bitcoin, Ethereum, Solana, DeFi, or memecoins."},{status:400});
   await runAsUser(u,()=>requireWorkspaceRole(u.id,["owner","admin","editor"]));
   if(!(await consumeUsage(u,"generations")))return NextResponse.json({error:"Daily generation limit reached for your plan."},{status:429});const drafts=buildDrafts(b.topic.trim());
   try{
