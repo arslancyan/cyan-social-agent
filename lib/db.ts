@@ -7,7 +7,7 @@ const pool = globalThis.__cyanPool ?? new Pool({connectionString:databaseUrl,max
 globalThis.__cyanPool=pool;
 
 export async function dbReady(){
- if(!databaseUrl) throw new Error("Database connection is not configured. Set DATABASE_URL (or a supported Vercel Postgres/Neon connection variable).");
+ if(!databaseUrl) throw new Error("Database connection is not configured. Set DATABASE_URL (or POSTGRES_URL).");
  if(globalThis.__cyanSchemaPromise)return globalThis.__cyanSchemaPromise;
  globalThis.__cyanSchemaPromise=(async()=>{await pool.query(`
 CREATE TABLE IF NOT EXISTS cyan_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,plan TEXT NOT NULL DEFAULT 'free',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
@@ -21,7 +21,7 @@ CREATE INDEX IF NOT EXISTS cyan_events_workspace_idx ON cyan_events(workspace_id
 CREATE INDEX IF NOT EXISTS cyan_events_platform_time_idx ON cyan_events(workspace_id,platform,created_at DESC);\nCREATE INDEX IF NOT EXISTS cyan_events_workspace_draft_idx ON cyan_events(workspace_id,draft_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS cyan_subscriptions(user_id TEXT PRIMARY KEY REFERENCES cyan_users(id) ON DELETE CASCADE,provider TEXT NOT NULL DEFAULT 'none',customer_id TEXT NULL,subscription_id TEXT NULL,status TEXT NOT NULL DEFAULT 'inactive',stripe_event_created_at BIGINT NOT NULL DEFAULT 0,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS cyan_stripe_events(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,event_created_at BIGINT NOT NULL DEFAULT 0,processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS cyan_drafts(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,angle TEXT NOT NULL,content TEXT NOT NULL,status TEXT NOT NULL,scheduled_at TIMESTAMPTZ NULL,trend_id TEXT NULL,protected BOOLEAN NOT NULL DEFAULT FALSE,media_url TEXT NULL,media_type TEXT NULL,external_id TEXT NULL,publish_attempts INTEGER NOT NULL DEFAULT 0,publish_started_at TIMESTAMPTZ NULL,features JSONB NOT NULL DEFAULT '{}'::jsonb,experiment_id TEXT NULL,variant TEXT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS cyan_drafts(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL DEFAULT 'local',platform TEXT NOT NULL,angle TEXT NOT NULL,content TEXT NOT NULL,status TEXT NOT NULL,scheduled_at TIMESTAMPTZ NULL,trend_id TEXT NULL,protected BOOLEAN NOT NULL DEFAULT FALSE,media_url TEXT NULL,media_type TEXT NULL,external_id TEXT NULL,publish_attempts INTEGER NOT NULL DEFAULT 0,publish_started_at TIMESTAMPTZ NULL,features JSONB NOT NULL DEFAULT '{}'::jsonb,experiment_id TEXT NULL,variant TEXT NULL,exploration BOOLEAN NOT NULL DEFAULT FALSE,reply_to_id TEXT NULL,reply_opt_in_confirmed BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_url TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS media_type TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS external_id TEXT NULL;
@@ -31,6 +31,8 @@ ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS features JSONB NOT NULL DEFAULT
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS experiment_id TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS variant TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS exploration BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS reply_to_id TEXT NULL;
+ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS reply_opt_in_confirmed BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'not_required';
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS approval_by TEXT NULL;
 ALTER TABLE cyan_drafts ADD COLUMN IF NOT EXISTS approval_at TIMESTAMPTZ NULL;
