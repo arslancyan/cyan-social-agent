@@ -6,7 +6,7 @@ This simplified edition runs its crypto worker on GitHub Actions. It does not re
 
 - Checks English-language crypto news (Bitcoin, Ethereum, Solana, DeFi, memecoins and NFTs).
 - Publishes at most one crypto post every 3 hours when a suitable news item is found.
-- Searches X every 15 minutes for English crypto posts with at least 500,000 reported impressions.
+- Searches up to 10 recent X posts every 3 hours for English crypto posts with at least 500,000 reported impressions, reducing read usage by default.
 - Creates a GitHub Issue for each viral-post reply draft so you can review it.
 - Sends a reply only after you add BOTH `cyan-approved` and `cyan-opt-in-confirmed` labels to the issue.
 - Uses a simple fallback draft if `OPENAI_API_KEY` is not configured.
@@ -46,8 +46,8 @@ The next workflow run sends the reply and closes the issue. Do not add these lab
 ## Important limitations
 
 - GitHub Actions runs the worker, but it does not host this repository's interactive Next.js dashboard. GitHub Pages serves static files and cannot run these API routes.
-- X search and posting require valid X API credentials and an X API plan that permits the requested endpoints and metrics. If X returns 401, 403 or 429, open the failed workflow run to see the error.
-- The 500,000 threshold uses the impression count returned by X. If your access tier does not expose impression metrics, viral detection cannot reliably classify posts.
+- X search and posting require valid X API credentials and an X API plan that permits the requested endpoints and metrics. X uses consumption-based API billing for many endpoints; GitHub hosting is free, but X API usage is not guaranteed to be free. Check the [X Developer pricing page](https://developer.x.com/) and set a spending limit before enabling this worker. If X returns 401, 403 or 429, open the failed workflow run to see the error.
+- To reduce potential API charges, the worker checks at most 10 recent posts once per 3 hours. The 500,000 threshold uses the impression count returned by X. If your access tier does not expose impression metrics, viral detection cannot reliably classify posts.
 - GitHub's scheduled workflows may start late. The worker checks the 3-hour cadence when it runs; this is not a guaranteed real-time scheduler.
 - The worker uses OAuth 1.0a credentials stored as GitHub Actions secrets. If the X app keys are revoked or permissions change, update the secrets.
 - The rest of the original multi-user web app remains in the repository, but this workflow no longer depends on its database or Vercel deployment.
