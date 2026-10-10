@@ -32,7 +32,9 @@ export async function GET(req:NextRequest){
   if(!token.refresh_token){
    return NextResponse.json({error:"Google did not return a refresh token. Disconnect this app in Google Account permissions and reconnect with consent, or verify OAuth access_type=offline."},{status:502,headers:{"Cache-Control":"no-store"}});
   }
-  await runAsUser(user,()=>saveConnection("YouTube",await encryptSecret(String(token.access_token)),await encryptSecret(String(token.refresh_token)),"YouTube channel"),oauthWorkspace);
+  const encryptedAccess=await encryptSecret(String(token.access_token));
+  const encryptedRefresh=await encryptSecret(String(token.refresh_token));
+  await runAsUser(user,()=>saveConnection("YouTube",encryptedAccess,encryptedRefresh,"YouTube channel"),oauthWorkspace);
   c.delete("cyan_youtube_state");c.delete("cyan_youtube_oauth_workspace");
   return NextResponse.redirect(new URL("/?connected=YouTube",req.url));
  }catch(e){
