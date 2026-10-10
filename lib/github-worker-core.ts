@@ -3,7 +3,7 @@ import {createHmac,randomBytes} from "node:crypto";
 export const CRYPTO_QUERY='(bitcoin OR BTC OR ethereum OR ETH OR solana OR SOL OR DeFi OR memecoin OR "meme coin" OR NFT OR NFTs) -is:retweet lang:en';
 export const VIRAL_THRESHOLD=500_000;
 export const POST_INTERVAL_MS=3*60*60*1000;
-export const SCAN_INTERVAL_MS=15*60*1000;
+export const SCAN_INTERVAL_MS=3*60*60*1000;
 
 export function isCrypto(text:string){
  return /\b(bitcoin|btc|ethereum|eth|solana|sol|defi|web3|blockchain|memecoin|meme coin|nfts?|stablecoin|usdc|usdt|staking|airdrop|altcoin|dex|cex|tokenomics|\$btc|\$eth|\$sol|\$pepe|\$ponke|\$fren|\$donkee)\b/i.test(text||"");
