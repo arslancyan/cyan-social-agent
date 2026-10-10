@@ -42,9 +42,6 @@ jobs:
 
       - name: Request GitHub OIDC token
         id: oidc
-        env:
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
         run: |
           set -euo pipefail
           token_json="$(curl --fail --silent --show-error \
