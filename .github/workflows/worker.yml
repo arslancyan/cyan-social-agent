@@ -1,20 +1,20 @@
-name: CYAN Worker
+name: CYAN Free GitHub Worker
 
 on:
   schedule:
-    - cron: "2/5 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write
+  issues: write
 
 concurrency:
-  group: cyan-worker-production
+  group: cyan-free-worker
   cancel-in-progress: false
 
 jobs:
-  tick:
+  crypto-agent:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -30,33 +30,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate required worker configuration
+      - name: Validate required secrets
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${DATABASE_URL:-}" ]; then
-            echo "Repository secret DATABASE_URL is required for the standalone GitHub Actions worker."
-            exit 1
-          fi
+          for key in X_API_KEY X_API_SECRET X_ACCESS_TOKEN X_ACCESS_TOKEN_SECRET; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing repository secret: $key"
+              exit 1
+            fi
+          done
 
-      - name: Request GitHub OIDC token
-        id: oidc
-        run: |
-          set -euo pipefail
-          token_json="$(curl --fail --silent --show-error \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            -H "Accept: application/json; api-version=2.0" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=cyan-social-agent-worker")"
-          token="$(printf '%s' "$token_json" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
-          echo "::add-mask::$token"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-
-      - name: Run crypto worker directly in GitHub Actions
+      - name: Run CYAN crypto worker
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          CYAN_WORKER_AUDIENCE: cyan-social-agent-worker
-          CYAN_WORKER_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
-        run: npm run worker:tick
+        run: npm run worker:github
