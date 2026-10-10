@@ -30,6 +30,25 @@ In **Settings → Secrets and variables → Actions → New repository secret**,
 
 Never paste these keys into an issue, source file, or chat.
 
+### YouTube OAuth and publishing
+
+The `feature/youtube-social-publisher` branch adds a YouTube connection flow and official YouTube Data API upload support. Before testing, configure a Google Cloud project, enable **YouTube Data API v3**, create an OAuth web client, and add this exact authorized redirect URI:
+
+```
+https://YOUR_CYAN_HOST/api/connect/youtube/callback
+```
+
+Add these variables to the deployment secret manager (not to Git):
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI` (must exactly match the OAuth client setting)
+- `YOUTUBE_DEFAULT_PRIVACY_STATUS` (`private`, `unlisted`, or `public`; defaults to `private`)
+
+The upload path currently accepts a public HTTPS video URL and buffers videos up to 512 MB in the app server before uploading through the official resumable upload API. Use private visibility for initial tests. YouTube decides Shorts classification based on the uploaded video's format and current Shorts rules.
+
+See [ChatGPT Social Publisher integration notes](docs/social-publisher-chatgpt.md) for platform permissions and the remaining MCP/plugin deployment work.
+
 ### 3. Optional AI writing
 
 Add `OPENAI_API_KEY` as a repository secret for more context-aware writing. Set the repository variable `OPENAI_MODEL` if you want a model other than the default. Without an API key, CYAN uses a basic fallback template; ChatGPT subscriptions do not include API credits.
