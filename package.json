@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "verify": "npm run typecheck && npm test && npm run build",
-    "worker:tick": "tsx scripts/run-worker.ts"
+    "worker:tick": "tsx scripts/run-worker.ts",
+    "worker:github": "tsx scripts/github-worker.ts"
   },
   "dependencies": {
     "next": "15.5.27",
