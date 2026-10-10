@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: read
   id-token: write
 
 concurrency:
@@ -15,40 +16,50 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
-      - name: Run CYAN worker
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate required worker configuration
         env:
-          CYAN_APP_URL: ${{ vars.CYAN_APP_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
-          if [ -z "${CYAN_APP_URL:-}" ]; then
-            echo "CYAN_APP_URL repository variable is not configured."
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "Repository secret DATABASE_URL is required for the standalone GitHub Actions worker."
             exit 1
           fi
-          health_status="$(curl --silent --show-error --max-time 20 --output /tmp/cyan-health.json --write-out "%{http_code}" "${CYAN_APP_URL%/}/api/health")"
-          echo "CYAN health HTTP status: ${health_status}"
-          cat /tmp/cyan-health.json
-          if [ "${health_status}" != "200" ]; then
-            echo "CYAN runtime health preflight failed."
-            exit 1
-          fi
-          unauth_status="$(curl --silent --show-error --max-time 20 --output /tmp/cyan-unauth.json --write-out "%{http_code}" -X POST "${CYAN_APP_URL%/}/api/worker/tick" -H "Accept: application/json")"
-          echo "CYAN unauthenticated worker HTTP status: ${unauth_status}"
-          cat /tmp/cyan-unauth.json
-          if [ "${unauth_status}" != "401" ]; then
-            echo "CYAN worker authentication preflight failed."
-            exit 1
-          fi
-          oidc_token="$(curl --fail --silent --show-error \
+
+      - name: Request GitHub OIDC token
+        id: oidc
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+        run: |
+          set -euo pipefail
+          token_json="$(curl --fail --silent --show-error \
             -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             -H "Accept: application/json; api-version=2.0" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${CYAN_APP_URL%/}")"
-          token="$(printf '%s' "$oidc_token" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
-          worker_status="$(curl --fail-with-body --silent --show-error --max-time 280 --output /tmp/cyan-worker.json --write-out "%{http_code}" \
-            -X POST "${CYAN_APP_URL%/}/api/worker/tick" \
-            -H "x-github-oidc-token: ${token}" \
-            -H "Accept: application/json")"
-          echo "CYAN authenticated worker HTTP status: ${worker_status}"
-          cat /tmp/cyan-worker.json
-          python -c 'import json,sys; d=json.load(open("/tmp/cyan-worker.json")); assert d.get("ok") is True, "worker response did not report ok=true"'
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=cyan-social-agent-worker")"
+          token="$(printf '%s' "$token_json" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Run crypto worker directly in GitHub Actions
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CYAN_WORKER_AUDIENCE: cyan-social-agent-worker
+          CYAN_WORKER_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        run: npm run worker:tick
