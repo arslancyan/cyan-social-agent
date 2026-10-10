@@ -27,7 +27,7 @@ async function authorized(req:NextRequest){
 }
 
 async function pollCryptoNews(){
- const query=process.env.GDELT_TREND_QUERY||"(bitcoin OR ethereum OR solana OR DeFi OR memecoin OR NFT OR crypto)";
+ const query=process.env.GDELT_TREND_QUERY||"(bitcoin OR ethereum OR solana OR DeFi OR memecoin OR \"meme coin\" OR NFT OR NFTs OR crypto) sourcelang:english";
  const url="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(query)+"&mode=artlist&format=json&maxrecords=50&timespan=1h";
  const response=await fetch(url,{cache:"no-store",headers:{accept:"application/json"},signal:AbortSignal.timeout(10000)});
  if(!response.ok)throw new Error("Crypto news source returned "+response.status);
