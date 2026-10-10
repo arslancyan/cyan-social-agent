@@ -1,4 +1,4 @@
-export type Platform="X"|"TikTok"|"Instagram"|"Facebook";
+export type Platform="X"|"TikTok"|"Instagram"|"Facebook"|"YouTube";
 export type QueueStatus="draft"|"review"|"scheduled"|"publishing"|"published"|"failed";
 export type PriorityMode="conservative"|"smart"|"autonomous";
 export interface Trend{ id:string; title:string; summary:string; sourceUrl?:string; score:number; views?:number; velocity?:number; relevance?:number; createdAt:string; }
