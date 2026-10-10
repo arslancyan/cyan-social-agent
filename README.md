@@ -1,65 +1,71 @@
-# CYAN Social Agent
+# CYAN Social Agent — free GitHub worker
 
-CYAN is a multi-user SaaS foundation for an AI social-media agent.
+This simplified edition runs its crypto worker on GitHub Actions. It does not require Vercel, a paid host, a custom domain, or an external database. Review drafts are stored as GitHub Issues; cadence state is stored in `data/worker-state.json`.
 
-## Core workflow
-Discover → Verify → Score → Generate → Adapt → Review → Schedule → Publish → Analyze.
+## What it does
 
-## Product modes
-- **AI posts:** generate platform-native content from a trend or source.
-- **AI video:** generate short vertical videos through the server-side Higgsfield provider gateway; autonomous mode only spends video generation on high-priority, quality-gated candidates.
-- **Manual posts:** write your own post, save it as a draft, or put it directly into the calendar.
-- **Dynamic scheduler:** the Priority Engine can interrupt flexible scheduled posts when a breakout trend is detected.
-- **Protected posts:** important/sponsored posts can be locked so automation never moves them.
-- **Human / Smart / Autonomous:** control how much publishing and reprioritization CYAN may perform.
+- Checks English-language crypto news (Bitcoin, Ethereum, Solana, DeFi, memecoins and NFTs).
+- Publishes at most one crypto post every 3 hours when a suitable news item is found.
+- Searches X every 15 minutes for English crypto posts with at least 500,000 reported impressions.
+- Creates a GitHub Issue for each viral-post reply draft so you can review it.
+- Sends a reply only after you add BOTH `cyan-approved` and `cyan-opt-in-confirmed` labels to the issue.
+- Uses a simple fallback draft if `OPENAI_API_KEY` is not configured.
 
-## Priority Engine
-CYAN scores velocity, engagement, freshness, relevance and view thresholds. A 1M+ view event is a strong signal, but relevance and velocity also matter; the system does not treat raw views alone as proof that a trend should interrupt the calendar.
+## One-time setup
 
-## SaaS architecture
-The public product is designed for multi-user accounts, subscriptions, per-user quotas, OAuth social connections, encrypted credentials, scheduled jobs and analytics. The current repository is the application foundation; production database, billing and platform OAuth credentials must be configured before public auto-publishing.
+### 1. Enable GitHub Actions
 
-## Safety
-Social publishing is gated behind official platform APIs and user authorization. CYAN does not use browser automation or attempt to evade anti-spam/bot-detection controls.
+Open the repository's **Settings → Actions → General** and make sure Actions are allowed. The workflow runs every 15 minutes; you can also start it manually from **Actions → CYAN Free GitHub Worker → Run workflow**.
 
-## Cloud worker
-`vercel.json` defines a daily fallback worker tick at `/api/worker/tick` for Vercel Hobby. A free GitHub Actions worker also calls the same endpoint every 5 minutes. The dashboard controls the persistent `cyan_control` state; PostgreSQL stores drafts, trends and worker runs. Set `DATABASE_URL` and either `CRON_SECRET` or `CYAN_WORKER_SECRET` before production use. For the GitHub Actions worker, configure repository variable `CYAN_APP_URL` and repository secret `CYAN_WORKER_SECRET`; the latter must match the Vercel secret.
+### 2. Add X API secrets
 
-When `TREND_SOURCE_URL` is configured, the worker expects JSON shaped like `{ "trends": [{ "id", "title", "summary", "views", "velocity", "engagement", "freshness", "relevance", "sourceUrl" }] }`, scores each signal, stores it, and may reprioritize flexible scheduled posts when the viral threshold is reached. The actual social publishing adapters require official OAuth/API connections. X and TikTok are already implemented; Instagram and Facebook now use the Meta Graph API through the Meta OAuth flow. Video posts require a publicly reachable media URL, so the Higgsfield output must be accessible to the platform APIs. Higgsfield video generation requires server-only `HF_API_KEY` plus the configured provider gateway (`HF_VIDEO_WEBHOOK_URL` and status URL); CYAN never exposes that credential to the browser. Studio users can generate a video from a TikTok/Instagram draft, while autonomous mode uses a high-priority cost/quality gate.
+In **Settings → Secrets and variables → Actions → New repository secret**, add these four secrets from your X Developer Portal app. Configure the app for **Read and Write** access and generate its user access token and secret.
 
-## Local development
+| Secret | Value |
+|---|---|
+| `X_API_KEY` | X app API key / consumer key |
+| `X_API_SECRET` | X app API secret / consumer secret |
+| `X_ACCESS_TOKEN` | X user access token |
+| `X_ACCESS_TOKEN_SECRET` | X user access token secret |
+
+Never paste these keys into an issue, source file, or chat.
+
+### 3. Optional AI writing
+
+Add `OPENAI_API_KEY` as a repository secret for more context-aware writing. Set the repository variable `OPENAI_MODEL` if you want a model other than the default. Without an API key, CYAN uses a basic fallback template; ChatGPT subscriptions do not include API credits.
+
+### 4. Review viral reply drafts
+
+Open the repository's **Issues** tab. Drafts have the `cyan-review` label and link to the original X post. Read the original post, edit the suggested reply if needed, and only if the author has explicitly opted in, add both labels:
+
+- `cyan-approved`
+- `cyan-opt-in-confirmed`
+
+The next workflow run sends the reply and closes the issue. Do not add these labels unless you have actually verified opt-in.
+
+## Important limitations
+
+- GitHub Actions runs the worker, but it does not host this repository's interactive Next.js dashboard. GitHub Pages serves static files and cannot run these API routes.
+- X search and posting require valid X API credentials and an X API plan that permits the requested endpoints and metrics. If X returns 401, 403 or 429, open the failed workflow run to see the error.
+- The 500,000 threshold uses the impression count returned by X. If your access tier does not expose impression metrics, viral detection cannot reliably classify posts.
+- GitHub's scheduled workflows may start late. The worker checks the 3-hour cadence when it runs; this is not a guaranteed real-time scheduler.
+- The worker uses OAuth 1.0a credentials stored as GitHub Actions secrets. If the X app keys are revoked or permissions change, update the secrets.
+- The rest of the original multi-user web app remains in the repository, but this workflow no longer depends on its database or Vercel deployment.
+
+## Troubleshooting
+
+1. Open **Actions → CYAN Free GitHub Worker**.
+2. Open the latest run and read the failed step logs.
+3. `Missing repository secret` means a secret name is missing or empty.
+4. X API `401/403` usually means invalid credentials, insufficient access or permissions.
+5. X API `429` means rate limits or usage limits were reached.
+6. A viral post without an available impression count will not be queued.
+
+## Local checks
+
 ```bash
-npm install
-npm run dev
+npm ci
+npm run typecheck
+npm test
+npm run build
 ```
-
-Required environment variables are documented in `.env.example`. For Meta publishing, configure `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`, and `META_GRAPH_VERSION`, then register the callback path `/api/connect/meta/callback` in the Meta app. One Meta authorization discovers a Facebook Page and its linked Instagram Business/Creator account; CYAN stores the Page token for Facebook and the linked account metadata for Instagram. Meta permissions/app review requirements are controlled by Meta and must be satisfied before production publishing.
-
-
-## Social connections
-
-X is the first live publishing adapter. The dashboard starts an OAuth 2.0 PKCE flow, exchanges the authorization code, encrypts the returned access/refresh tokens with AES-GCM, and stores only the encrypted values in PostgreSQL. Publishing uses the official X API endpoint; CYAN does not store or request the user's X password. X documents OAuth 2.0 PKCE as a supported user-token flow.
-
-Required X variables:
-- `X_CLIENT_ID`
-- `X_CLIENT_SECRET` (when the X app is configured as a confidential client)
-- `X_REDIRECT_URI`
-- `CYAN_TOKEN_ENCRYPTION_KEY` — 32 random bytes, base64 encoded
-
-For a production SaaS, the next security layer is user authentication and tenant isolation so every workspace has its own identity, connections, queue and quotas. The current repository still uses `CYAN_WORKSPACE_ID` as the workspace boundary while that layer is being built.
-
-## Deployment
-
-The repository includes a Vercel Cron entry for `/api/worker/tick`. Vercel supports cron-triggered Functions; current Vercel documentation notes that minute-level cron precision is available on Pro/Enterprise, while Hobby has lower scheduling precision. For frequent trend checks on a free setup, GitHub Actions provides the current 5-minute worker cadence. Scheduled GitHub Actions can be delayed, so this is not hard real-time. Upgrade the worker infrastructure later if tighter timing is required.
-
-
-### Production runtime checklist
-
-Before enabling the worker, configure the Vercel Production environment with `DATABASE_URL` (or a supported Postgres equivalent). The worker initializes the CYAN schema automatically on first successful tick. `GET /api/health` should return HTTP 200 with `status: "ok"` once the database is reachable.
-
-The GitHub Actions worker uses GitHub OIDC, so it does not require a long-lived worker secret. Keep the repository variable `CYAN_APP_URL` aligned with the deployed Vercel URL. If `GITHUB_OIDC_AUDIENCE` is set, it must match the same audience.
-
-If the database is missing, `/api/worker/tick` intentionally returns HTTP 503 with `code: "DATABASE_NOT_CONFIGURED"` instead of presenting the infrastructure problem as a generic application failure.
-
-
-<!-- Production redeploy trigger: refresh runtime environment after infrastructure configuration. -->
